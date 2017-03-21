@@ -1,5 +1,8 @@
 import facebook, logging, ConfigParser, sys
 logging.basicConfig(level=logging.INFO)
+from datetime import datetime
+
+fb_datetime_format = "%Y-%m-%dT%H:%M:%S" # 2017-03-21T14:18:11+0000
 
 if len(sys.argv) > 1:
     config_file = sys.argv[1]
@@ -42,6 +45,27 @@ try:
 except facebook.GraphAPIError, e:
     logging.error("Errors during connections to Facebook Graph API: %s." % e)
 
+try:
+    datetime_format = config.get("Datetime","datetime_format")
+except ConfigParser.NoOptionError, e:
+    datetime_format = "%Y-%m-%d %H:%M:%S"
+
+try:
+    since_datetime = datetime.strptime(
+        config.get("Datetime","since_datetime"),
+        datetime_format
+    )
+except ConfigParser.NoOptionError, e:
+    since_datetime = datetime.fromtimestamp(0)
+
+try:
+    until_datetime = datetime.strptime(
+        config.get("Datetime","until_datetime"),
+        datetime_format
+    )
+except ConfigParser.NoOptionError, e:
+    until_datetime = datetime.now()
+
 posts = graph.get_all_connections(
     id = group_id,
     connection_name = "feed",
@@ -51,7 +75,19 @@ posts = graph.get_all_connections(
 for post in posts:
 
     #print post
+    post_datetime = datetime.strptime(
+            post['updated_time'][:19],
+        fb_datetime_format
+    )
+
+    if post_datetime > until_datetime:
+        continue
+
+    if post_datetime < since_datetime:
+        break
+
     logging.info("- %s" % post['message'])
+    logging.info("+ DATETIME: %s" % post['updated_time'])
     logging.info("+ AUTHOR: %s" % post['from']['name'])
 
     #likes = graph.get_all_connections(
@@ -81,6 +117,7 @@ for post in posts:
 
         #print comment
         logging.info("-- %s" % comment['message'])
+        logging.info("++ DATETIME: %s" % comment['created_time'])
         logging.info("++ AUTHOR: %s" % comment['from']['name'])
 
         comment_likes = graph.get_all_connections(
@@ -101,6 +138,7 @@ for post in posts:
 
             #print response
             logging.info("--- %s" % response['message'])
+            logging.info("+++ DATETIME: %s" % response['created_time'])
             logging.info("+++ AUTHOR: %s" % response['from']['name'])
 
             response_likes = graph.get_all_connections(
@@ -111,6 +149,4 @@ for post in posts:
             for like in response_likes:
                 #print like
                 logging.info("+++ LIKE: %s" % like['name'])
-
-    break
 
