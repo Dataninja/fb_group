@@ -42,8 +42,10 @@ except ConfigParser.NoOptionError, e:
 
 try:
     group = graph.get_object(id = group_id)
+    logging.info("Group: %s" % group['name'])
 except facebook.GraphAPIError, e:
     logging.error("Errors during connections to Facebook Graph API: %s." % e)
+    exit()
 
 try:
     datetime_format = config.get("Datetime","datetime_format")
@@ -66,17 +68,35 @@ try:
 except ConfigParser.NoOptionError, e:
     until_datetime = datetime.now()
 
+# Group members: https://developers.facebook.com/docs/graph-api/reference/v2.8/group/members
+members = graph.get_all_connections(
+    id = group_id,
+    connection_name = "members"
+)
+
+num_members = 0
+for member in members:
+    #print member
+    num_members += 1
+    logging.info("- MEMBER: %s" % member['name'])
+    if not num_members%25:
+        break
+
 posts = graph.get_all_connections(
     id = group_id,
     connection_name = "feed",
     fields = "id,message,from,updated_time"
 )
 
+num_posts = 0
+num_reactions = 0
+num_comments = 0
 for post in posts:
 
     #print post
+    num_posts += 1
     post_datetime = datetime.strptime(
-            post['updated_time'][:19],
+        post['updated_time'][:19],
         fb_datetime_format
     )
 
@@ -86,7 +106,7 @@ for post in posts:
     if post_datetime < since_datetime:
         break
 
-    logging.info("- %s" % post['message'])
+    logging.info("- POST: %s" % post['message'])
     logging.info("+ DATETIME: %s" % post['updated_time'])
     logging.info("+ AUTHOR: %s" % post['from']['name'])
 
@@ -106,6 +126,7 @@ for post in posts:
 
     for reaction in post_reactions:
         #print reaction
+        num_reactions += 1
         logging.info("+ %s: %s" % ( reaction['type'] , reaction['name']))
 
     comments = graph.get_all_connections(
@@ -116,7 +137,8 @@ for post in posts:
     for comment in comments:
 
         #print comment
-        logging.info("-- %s" % comment['message'])
+        num_comments += 1
+        logging.info("-- COMMENT: %s" % comment['message'])
         logging.info("++ DATETIME: %s" % comment['created_time'])
         logging.info("++ AUTHOR: %s" % comment['from']['name'])
 
@@ -127,6 +149,7 @@ for post in posts:
 
         for like in comment_likes:
             #print like
+            num_reactions += 1
             logging.info("++ LIKE: %s" % like['name'])
 
         responses = graph.get_all_connections(
@@ -137,7 +160,8 @@ for post in posts:
         for response in responses:
 
             #print response
-            logging.info("--- %s" % response['message'])
+            num_comments += 1
+            logging.info("--- RESPONSE: %s" % response['message'])
             logging.info("+++ DATETIME: %s" % response['created_time'])
             logging.info("+++ AUTHOR: %s" % response['from']['name'])
 
@@ -150,3 +174,11 @@ for post in posts:
                 #print like
                 logging.info("+++ LIKE: %s" % like['name'])
 
+logging.info(
+    "Members: %d | Posts: %d | Reactions: %d | Comments: %d" % (
+        num_members,
+        num_posts,
+        num_reactions,
+        num_comments
+    )
+)
