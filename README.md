@@ -4,7 +4,7 @@ Download all data from a Facebook Group: posts, comments (and subcomments), like
 
 ## Installation
 
-Set a virtualenv: `virtualenv facebookend && source facebookenv/bin/activate`.
+Set a virtualenv: `virtualenv facebookenv && source facebookenv/bin/activate`.
 
 Install dependencies: `pip install -r requirements.txt`.
 
