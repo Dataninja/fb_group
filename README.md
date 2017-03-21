@@ -12,7 +12,8 @@ Install dependencies: `pip install -r requirements.txt`.
 
 Copy `example.cnf` to `your_group_name.cnf`.
 
-Edit `your_group_name.cnf` adding your access\_token (or app\_id and app\_secret) e your group\_id.
+Edit `your_group_name.cnf` adding your access\_token (or app\_id and app\_secret) and your group\_id.
+Change other options if needed.
 
 Run: `python fb_group.py your_group_name.cnf`.
 
