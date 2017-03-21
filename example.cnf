@@ -9,3 +9,7 @@ id:
 #datetime_format: %%Y-%%m-%%d %%H:%%M:%%S
 #since_datetime: 
 #until_datetime: 
+
+[Graph]
+graph_type = json
+#file_name = graph.json
