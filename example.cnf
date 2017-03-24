@@ -11,5 +11,4 @@ id:
 #until_datetime: 
 
 [Graph]
-graph_type = json
-#file_name = graph.json
+#file_name = graph

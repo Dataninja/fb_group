@@ -61,40 +61,47 @@ try:
         config.get("Datetime","since_datetime"),
         datetime_format
     )
+    G.graph['since'] = since_datetime.strftime(fb_datetime_format)
 except ConfigParser.NoOptionError, e:
-    since_datetime = datetime.fromtimestamp(0)
-G.graph['since'] = since_datetime.strftime(fb_datetime_format)
+    since_datetime = None
+    G.graph['since'] = datetime.fromtimestamp(0).strftime(fb_datetime_format)
 
 try:
     until_datetime = datetime.strptime(
         config.get("Datetime","until_datetime"),
         datetime_format
     )
+    G.graph['until'] = until_datetime.strftime(fb_datetime_format)
 except ConfigParser.NoOptionError, e:
-    until_datetime = datetime.now()
-G.graph['until'] = until_datetime.strftime(fb_datetime_format)
+    until_datetime = None
+    G.graph['until'] = datetime.now().strftime(fb_datetime_format)
 
 # Group members: https://developers.facebook.com/docs/graph-api/reference/v2.8/group/members
-members = graph.get_all_connections(
-    id = group_id,
-    connection_name = "members",
-    fields = "id,name"
-)
-
 num_members = 0
-for member in members:
+if not since_datetime and not until_datetime:
+    members = graph.get_all_connections(
+        id = group_id,
+        connection_name = "members",
+        fields = "id,name"
+    )
 
-    logging.debug(member)
-    num_members += 1
+    for member in members:
 
-    G.add_node(member['id'], type = 'user', **member) # user
+        logging.debug(member)
+        num_members += 1
 
-    logging.info("- MEMBER: %s" % member['name'])
+        G.add_node(member['id'], type = 'user', **member) # user
+
+        logging.info("- MEMBER: %s" % member['name'])
+
+logging.info("Download graph from %s to %s" % ( G.graph['since'] , G.graph['until'] ))
 
 posts = graph.get_all_connections(
     id = group_id,
     connection_name = "feed",
-    fields = "id,message,from,updated_time"
+    fields = "id,message,from,updated_time",
+    since = since_datetime and (since_datetime - datetime(1970, 1, 1)).total_seconds(),
+    until = until_datetime and (until_datetime - datetime(1970, 1, 1)).total_seconds()
 )
 
 num_posts = 0
@@ -104,16 +111,6 @@ for post in posts:
 
     logging.debug(post)
     num_posts += 1
-    post_datetime = datetime.strptime(
-        post['updated_time'][:19],
-        fb_datetime_format
-    )
-
-    if post_datetime > until_datetime:
-        continue
-
-    if post_datetime < since_datetime:
-        break
 
     G.add_node(post['id'], type = 'post', **post) # post
     G.add_node(post['from']['id'], type = 'user', **post['from']) # user
@@ -150,6 +147,18 @@ for post in posts:
     for comment in comments:
 
         logging.debug(comment)
+
+        comment_datetime = datetime.strptime(
+            comment['created_time'][:19],
+            fb_datetime_format
+        )
+
+        if since_datetime and comment_datetime < since_datetime:
+            continue
+
+        if until_datetime and comment_datetime > until_datetime:
+            continue
+
         num_comments += 1
 
         G.add_node(comment['id'], type = 'comment', **comment) # comment
@@ -220,10 +229,10 @@ for post in posts:
 
 logging.info(
     "Members: %d | Posts: %d | Reactions: %d | Comments: %d\nNodes: %d | Edges: %d" % (
-        num_members,
-        num_posts,
-        num_reactions,
-        num_comments,
+        len(filter(lambda (n, d): d['type'] == 'user', G.nodes(data=True))),
+        len(filter(lambda (n, d): d['type'] == 'post', G.nodes(data=True))),
+        len(filter(lambda (n1, n2, d): d['type'] == 'reacts to', G.edges(data=True))),
+        len(filter(lambda (n, d): d['type'] == 'comment', G.nodes(data=True))),
         G.number_of_nodes(),
         G.number_of_edges()
     )
@@ -235,25 +244,22 @@ except ConfigParser.NoOptionError, e:
     graph_type = "json"
 
 try:
-    file_name = config.get("Graph","file_name")
+    file_name = "%s_%s" % ( datetime.now().strftime("%Y%m%d%H%M") , config.get("Graph","file_name").split('.')[0] )
 except ConfigParser.NoOptionError, e:
-    file_name = "%s.%s" % ( G.graph['name'] , graph_type )
+    file_name = "%s_%s" % ( datetime.now().strftime("%Y%m%d%H%M") , G.graph['name'] )
 
-if graph_type == 'json':
-    from networkx.readwrite import json_graph
-    json_data = json_graph.node_link_data(G)
-    # node_link_data() sets links' target and source to nodes' indices in nodes array,
-    # not to real nodes' ids... this workaround fix this issue
-    for i,l in enumerate(json_data['links']):
-        json_data['links'][i]['target'] = json_data['nodes'][l['target']]['id']
-        json_data['links'][i]['source'] = json_data['nodes'][l['source']]['id']
-    # end workaround
-    with open(file_name,'w') as f:
-        json.dump(json_data, f)
-else:
-    try:
-        write_graph = getattr(nx, "write_%s" % graph_type)
-        write_graph(G, file_name)
-    except:
-        logging.error("Graph type not supported.")
+from networkx.readwrite import json_graph
+
+# node_link_data() sets links' target and source to nodes' indices in nodes array,
+# not to real nodes' ids... this workaround fix this issue
+json_data = json_graph.node_link_data(G)
+for i,l in enumerate(json_data['links']):
+    json_data['links'][i]['target'] = json_data['nodes'][l['target']]['id']
+    json_data['links'][i]['source'] = json_data['nodes'][l['source']]['id']
+# end workaround
+with open(file_name+".json",'w') as f:
+    json.dump(json_data, f)
+
+# export also in gexf format, supported by gephi
+nx.write_gexf(G, file_name+".gexf")
 
