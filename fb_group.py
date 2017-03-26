@@ -241,9 +241,9 @@ logging.info(
 
 # node positioning algo
 # http://networkx.readthedocs.io/en/latest/reference/drawing.html
-pos=nx.spring_layout(G) # Fruchterman-Reingold
-
-nx.set_node_attributes(G,'pos',pos)
+pos = nx.spring_layout(G) # Fruchterman-Reingold
+nx.set_node_attributes( G , 'x' , {str(k): float(v[0]) for k,v in pos.items()} )
+nx.set_node_attributes( G , 'y' , {str(k): float(v[1]) for k,v in pos.items()} )
 
 try:
     graph_type = config.get("Graph","graph_type")
