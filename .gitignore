@@ -2,3 +2,4 @@
 !example.cnf
 facebookenv/
 *.json
+*.gexf
