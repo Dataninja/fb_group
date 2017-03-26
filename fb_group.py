@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import facebook, logging, ConfigParser, sys, json
 logging.basicConfig(level=logging.INFO)
 from datetime import datetime
