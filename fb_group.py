@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import facebook, logging, ConfigParser, sys, json
 logging.basicConfig(level=logging.INFO)
 from datetime import datetime
@@ -237,6 +238,12 @@ logging.info(
         G.number_of_edges()
     )
 )
+
+# node positioning algo
+# http://networkx.readthedocs.io/en/latest/reference/drawing.html
+pos=nx.spring_layout(G) # Fruchterman-Reingold
+
+nx.set_node_attributes(G,'pos',pos)
 
 try:
     graph_type = config.get("Graph","graph_type")
