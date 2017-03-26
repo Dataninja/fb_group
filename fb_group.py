@@ -238,6 +238,12 @@ logging.info(
     )
 )
 
+# node positioning algo
+# http://networkx.readthedocs.io/en/latest/reference/drawing.html
+pos=nx.spring_layout(G) # Fruchterman-Reingold
+
+nx.set_node_attributes(G,'pos',pos)
+
 try:
     graph_type = config.get("Graph","graph_type")
 except ConfigParser.NoOptionError, e:
