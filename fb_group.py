@@ -91,7 +91,14 @@ if not since_datetime and not until_datetime:
         logging.debug(member)
         num_members += 1
 
-        G.add_node(member['id'], type = 'user', **member) # user
+        G.add_node(
+            member['id'],
+            type = 'user',
+            fid = member['id'],
+            label = member.get('name','__NA__'),
+            url = "https://facebook.com/%s" % member['id'],
+            name = member.get('name','__NA__')
+        ) # user
 
         logging.info("- MEMBER: %s" % member['name'])
 
@@ -113,8 +120,23 @@ for post in posts:
     logging.debug(post)
     num_posts += 1
 
-    G.add_node(post['id'], type = 'post', **post) # post
-    G.add_node(post['from']['id'], type = 'user', **post['from']) # user
+    G.add_node(
+        post['id'],
+        type = 'post',
+        fid = post['id'],
+        label = post.get('message','')[0:12]+'...',
+        url = "https://facebook.com/%s/posts/%s" % (post['from']['id'], post['id'].split('_')[1]),
+        message = post.get('message',''),
+        timestamp = post.get('updated_time','__NA__')
+    ) # post
+    G.add_node(
+        post['from']['id'],
+        type = 'user',
+        fid = post['from']['id'],
+        label = post['from'].get('name','__NA__'),
+        url = "https://facebook.com/%s" % post['from']['id'],
+        name = post['from'].get('name','__NA__')
+    ) # user
 
     G.add_edge(post['from']['id'], post['id'], type = 'is author of') # user -|is author of|> post
 
@@ -133,7 +155,14 @@ for post in posts:
         num_reactions += 1
 
         #G.add_node(reaction['type'], type = 'reaction') # reaction
-        G.add_node(reaction['id'], type = 'user', id = reaction['id'], name = reaction['name']) # user
+        G.add_node(
+            reaction['id'],
+            type = 'user',
+            fid = reaction['id'],
+            label = reaction.get('name','__NA__'),
+            url = "https://facebook.com/%s" % reaction['id'],
+            name = reaction.get('name','__NA__')
+        ) # user
 
         #G.add_edge(reaction['type'], post['id']) # reaction <--> post
         G.add_edge(reaction['id'], post['id'], type = 'reacts to', reaction = reaction['type']) # user -|reacts to|> post
@@ -162,8 +191,23 @@ for post in posts:
 
         num_comments += 1
 
-        G.add_node(comment['id'], type = 'comment', **comment) # comment
-        G.add_node(comment['from']['id'], type = 'user', **comment['from']) # user
+        G.add_node(
+            comment['id'],
+            type = 'comment',
+            fid = comment['id'],
+            label = comment.get('message','')[0:12]+'...',
+            url = "https://facebook.com/%s/posts/%s/?comment_id=%s" % (post['from']['id'], post['id'].split('_')[1], comment['id']),
+            message = comment.get('message',''),
+            timestamp = comment.get('created_time','__NA__')
+        ) # comment
+        G.add_node(
+            comment['from']['id'],
+            type = 'user',
+            fid = comment['from']['id'],
+            label = comment['from'].get('name','__NA__'),
+            url = "https://facebook.com/%s" % comment['from']['id'],
+            name = comment['from'].get('name','__NA__')
+        ) # user
 
         G.add_edge(comment['id'], post['id'], type = 'in reply to') # comment -|in reply to|> post
         G.add_edge(comment['from']['id'], comment['id'], type = 'is author of') # user -|is author of|> comment
@@ -183,7 +227,14 @@ for post in posts:
             num_reactions += 1
 
             #G.add_node('LIKE', type = 'reaction') # reaction
-            G.add_node(like['id'], type = 'user', **like) # user
+            G.add_node(
+                like['id'],
+                type = 'user',
+                fid = like['id'],
+                label = like.get('name','__NA__'),
+                url = "https://facebook.com/%s" % like['id'],
+                name = like.get('name','__NA__')
+            ) # user
 
             #G.add_edge('LIKE', comment['id']) # reaction <--> comment
             G.add_edge(like['id'], comment['id'], type = 'reacts to', reaction = 'LIKE') # user -|reacts to|> comment
@@ -200,8 +251,23 @@ for post in posts:
             logging.debug(reply)
             num_comments += 1
 
-            G.add_node(reply['id'], type = 'comment', **reply) # comment
-            G.add_node(reply['from']['id'], type = 'user', **reply['from']) # user
+            G.add_node(
+                reply['id'],
+                type = 'comment',
+                fid = reply['id'],
+                label = reply.get('message','')[0:12]+'...',
+                url = "https://facebook.com/%s/posts/%s/?comment_id=%s" % (post['from']['id'], post['id'].split('_')[1], reply['id']),
+                message = reply.get('message',''),
+                timestamp = reply.get('created_time','__NA__')
+            ) # comment
+            G.add_node(
+                reply['from']['id'],
+                type = 'user',
+                fid = reply['from']['id'],
+                label = reply['from'].get('name','__NA__'),
+                url = "https://facebook.com/%s" % reply['from']['id'],
+                name = reply['from'].get('name','__NA__')
+            ) # user
 
             G.add_edge(reply['id'], comment['id'], type = 'in reply to') # comment -|in reply to|> comment
             G.add_edge(reply['from']['id'], reply['id'], type = 'is author of') # user -|is author of|> comment
@@ -221,7 +287,14 @@ for post in posts:
                 num_reactions += 1
 
                 #G.add_node('LIKE', type = 'reaction') # reaction
-                G.add_node(like['id'], type = 'user', **like) # user
+                G.add_node(
+                    like['id'],
+                    type = 'user',
+                    fid = like['id'],
+                    label = like.get('name','__NA__'),
+                    url = "https://facebook.com/%s" % like['id'],
+                    name = like.get('name','__NA__')
+                ) # user
 
                 #G.add_edge('LIKE', reply['id']) # reaction <--> comment
                 G.add_edge(like['id'], reply['id'], type = 'reacts to', reaction = 'LIKE') # user -|reacts to|> comment
