@@ -5,7 +5,6 @@ from datetime import datetime
 import networkx as nx
 
 fb_datetime_format = "%Y-%m-%dT%H:%M:%S" # 2017-03-21T14:18:11+0000
-G = nx.DiGraph()
 
 if len(sys.argv) > 1:
     config_file = sys.argv[1]
@@ -44,9 +43,10 @@ except ConfigParser.NoOptionError, e:
     exit()
 
 try:
-    group = graph.get_object(id = group_id)
-    G.graph['name'] = group['name']
-    G.graph['last_update'] = datetime.now().strftime(fb_datetime_format)
+    group = graph.get_object(
+        id = group_id,
+        fields = "id,name,updated_time"
+    )
     logging.info("Group: %s" % group['name'])
 except facebook.GraphAPIError, e:
     logging.error("Errors during connections to Facebook Graph API: %s." % e)
@@ -58,58 +58,99 @@ except ConfigParser.NoOptionError, e:
     datetime_format = "%Y-%m-%d %H:%M:%S"
 
 try:
-    since_datetime = datetime.strptime(
-        config.get("Datetime","since_datetime"),
-        datetime_format
-    )
-    G.graph['since'] = since_datetime.strftime(fb_datetime_format)
+    mode = config.get("Graph","mode")
 except ConfigParser.NoOptionError, e:
-    since_datetime = None
-    G.graph['since'] = datetime.fromtimestamp(0).strftime(fb_datetime_format)
+    mode = "archive"
 
 try:
     until_datetime = datetime.strptime(
         config.get("Datetime","until_datetime"),
         datetime_format
     )
-    G.graph['until'] = until_datetime.strftime(fb_datetime_format)
 except ConfigParser.NoOptionError, e:
-    until_datetime = None
-    G.graph['until'] = datetime.now().strftime(fb_datetime_format)
+    until_datetime = datetime.now()
+
+if mode == "update":
+
+    try:
+        file_name = config.get("Graph","file_name").split('.')[0]
+    except ConfigParser.NoOptionError, e:
+        logging.error("Please provide a valid graph file in update mode.")
+        exit()
+
+    G = nx.read_gexf(file_name+'.gexf')
+    G.graph['timestamp'] = group['updated_time']
+
+    since_datetime = max([
+        datetime.strptime(
+            d['timestamp'].split('+')[0],
+            fb_datetime_format
+        )
+        for n,d in G.nodes(data=True)
+        if d['mtype'] == 'post'
+    ])
+
+else:
+
+    try:
+        file_name = "%s_%s" % ( datetime.now().strftime("%Y%m%d%H%M") , config.get("Graph","file_name").split('.')[0] )
+    except ConfigParser.NoOptionError, e:
+        file_name = "%s_%s" % ( datetime.now().strftime("%Y%m%d%H%M") , group['name'] )
+
+    G = nx.DiGraph()
+
+    G.graph['name'] = group['name']
+    G.graph['url'] = "https://www.facebook.com/groups/%s/" % group['id']
+    G.graph['timestamp'] = group['updated_time']
+
+    try:
+        since_datetime = datetime.strptime(
+            config.get("Datetime","since_datetime"),
+            datetime_format
+        )
+    except ConfigParser.NoOptionError, e:
+        since_datetime = datetime.fromtimestamp(0)
+
+G.graph['last_update'] = datetime.now().strftime(fb_datetime_format)
 
 # Group members: https://developers.facebook.com/docs/graph-api/reference/v2.8/group/members
 num_members = 0
-if not since_datetime and not until_datetime:
-    members = graph.get_all_connections(
-        id = group_id,
-        connection_name = "members",
-        fields = "id,name"
-    )
+try:
+    if config.getboolean("Graph","all_members"):
+        members = graph.get_all_connections(
+            id = group_id,
+            connection_name = "members",
+            fields = "id,name"
+        )
+    else:
+        members = []
+except ConfigParser.NoOptionError, e:
+    members = []
 
-    for member in members:
+for member in members:
 
-        logging.debug(member)
-        num_members += 1
+    logging.debug(member)
+    num_members += 1
 
-        G.add_node(
-            member['id'],
-            type = 'user',
-            fid = member['id'],
-            label = member.get('name','__NA__'),
-            url = "https://facebook.com/%s" % member['id'],
-            name = member.get('name','__NA__')
-        ) # user
+    G.add_node(
+        member['id'],
+        mtype = 'user',
+        fid = member['id'],
+        label = member.get('name','__NA__'),
+        url = "https://facebook.com/%s" % member['id'],
+        name = member.get('name','__NA__')
+    ) # user
 
-        logging.info("- MEMBER: %s" % member['name'])
+    logging.info("- MEMBER: %s" % member['name'])
 
-logging.info("Download graph from %s to %s" % ( G.graph['since'] , G.graph['until'] ))
+logging.info("Download graph from %s to %s" % ( since_datetime , until_datetime ))
 
 posts = graph.get_all_connections(
     id = group_id,
     connection_name = "feed",
     fields = "id,message,from,updated_time",
-    since = since_datetime and (since_datetime - datetime(1970, 1, 1)).total_seconds(),
-    until = until_datetime and (until_datetime - datetime(1970, 1, 1)).total_seconds()
+    since = int((since_datetime - datetime(1970, 1, 1)).total_seconds()),
+    until = int((until_datetime - datetime(1970, 1, 1)).total_seconds())
 )
 
 num_posts = 0
@@ -122,7 +163,7 @@ for post in posts:
 
     G.add_node(
         post['id'],
-        type = 'post',
+        mtype = 'post',
         fid = post['id'],
         label = post.get('message','')[0:12]+'...',
         url = "https://facebook.com/%s/posts/%s" % (post['from']['id'], post['id'].split('_')[1]),
@@ -131,14 +172,14 @@ for post in posts:
     ) # post
     G.add_node(
         post['from']['id'],
-        type = 'user',
+        mtype = 'user',
         fid = post['from']['id'],
         label = post['from'].get('name','__NA__'),
         url = "https://facebook.com/%s" % post['from']['id'],
         name = post['from'].get('name','__NA__')
     ) # user
 
-    G.add_edge(post['from']['id'], post['id'], type = 'is author of') # user -|is author of|> post
+    G.add_edge(post['from']['id'], post['id'], mtype = 'is author of') # user -|is author of|> post
 
     logging.info("- POST: %s" % post.get('message',''))
     logging.info("+ DATETIME: %s" % post['updated_time'])
@@ -154,10 +195,10 @@ for post in posts:
         logging.debug(reaction)
         num_reactions += 1
 
-        #G.add_node(reaction['type'], type = 'reaction') # reaction
+        #G.add_node(reaction['type'], mtype = 'reaction') # reaction
         G.add_node(
             reaction['id'],
-            type = 'user',
+            mtype = 'user',
             fid = reaction['id'],
             label = reaction.get('name','__NA__'),
             url = "https://facebook.com/%s" % reaction['id'],
@@ -165,7 +206,7 @@ for post in posts:
         ) # user
 
         #G.add_edge(reaction['type'], post['id']) # reaction <--> post
-        G.add_edge(reaction['id'], post['id'], type = 'reacts to', reaction = reaction['type']) # user -|reacts to|> post
+        G.add_edge(reaction['id'], post['id'], mtype = 'reacts to', reaction = reaction['type']) # user -|reacts to|> post
 
         logging.info("+ %s: %s" % ( reaction['type'] , reaction['name']))
 
@@ -183,17 +224,17 @@ for post in posts:
             fb_datetime_format
         )
 
-        if since_datetime and comment_datetime < since_datetime:
+        if comment_datetime < since_datetime:
             continue
 
-        if until_datetime and comment_datetime > until_datetime:
+        if comment_datetime > until_datetime:
             continue
 
         num_comments += 1
 
         G.add_node(
             comment['id'],
-            type = 'comment',
+            mtype = 'comment',
             fid = comment['id'],
             label = comment.get('message','')[0:12]+'...',
             url = "https://facebook.com/%s/posts/%s/?comment_id=%s" % (post['from']['id'], post['id'].split('_')[1], comment['id']),
@@ -202,15 +243,15 @@ for post in posts:
         ) # comment
         G.add_node(
             comment['from']['id'],
-            type = 'user',
+            mtype = 'user',
             fid = comment['from']['id'],
             label = comment['from'].get('name','__NA__'),
             url = "https://facebook.com/%s" % comment['from']['id'],
             name = comment['from'].get('name','__NA__')
         ) # user
 
-        G.add_edge(comment['id'], post['id'], type = 'in reply to') # comment -|in reply to|> post
-        G.add_edge(comment['from']['id'], comment['id'], type = 'is author of') # user -|is author of|> comment
+        G.add_edge(comment['id'], post['id'], mtype = 'in reply to') # comment -|in reply to|> post
+        G.add_edge(comment['from']['id'], comment['id'], mtype = 'is author of') # user -|is author of|> comment
 
         logging.info("-- COMMENT: %s" % comment.get('message',''))
         logging.info("++ DATETIME: %s" % comment['created_time'])
@@ -226,10 +267,10 @@ for post in posts:
             logging.debug(like)
             num_reactions += 1
 
-            #G.add_node('LIKE', type = 'reaction') # reaction
+            #G.add_node('LIKE', mtype = 'reaction') # reaction
             G.add_node(
                 like['id'],
-                type = 'user',
+                mtype = 'user',
                 fid = like['id'],
                 label = like.get('name','__NA__'),
                 url = "https://facebook.com/%s" % like['id'],
@@ -237,7 +278,7 @@ for post in posts:
             ) # user
 
             #G.add_edge('LIKE', comment['id']) # reaction <--> comment
-            G.add_edge(like['id'], comment['id'], type = 'reacts to', reaction = 'LIKE') # user -|reacts to|> comment
+            G.add_edge(like['id'], comment['id'], mtype = 'reacts to', reaction = 'LIKE') # user -|reacts to|> comment
 
             logging.info("++ LIKE: %s" % like['name'])
 
@@ -253,7 +294,7 @@ for post in posts:
 
             G.add_node(
                 reply['id'],
-                type = 'comment',
+                mtype = 'comment',
                 fid = reply['id'],
                 label = reply.get('message','')[0:12]+'...',
                 url = "https://facebook.com/%s/posts/%s/?comment_id=%s" % (post['from']['id'], post['id'].split('_')[1], reply['id']),
@@ -262,15 +303,15 @@ for post in posts:
             ) # comment
             G.add_node(
                 reply['from']['id'],
-                type = 'user',
+                mtype = 'user',
                 fid = reply['from']['id'],
                 label = reply['from'].get('name','__NA__'),
                 url = "https://facebook.com/%s" % reply['from']['id'],
                 name = reply['from'].get('name','__NA__')
             ) # user
 
-            G.add_edge(reply['id'], comment['id'], type = 'in reply to') # comment -|in reply to|> comment
-            G.add_edge(reply['from']['id'], reply['id'], type = 'is author of') # user -|is author of|> comment
+            G.add_edge(reply['id'], comment['id'], mtype = 'in reply to') # comment -|in reply to|> comment
+            G.add_edge(reply['from']['id'], reply['id'], mtype = 'is author of') # user -|is author of|> comment
 
             logging.info("--- reply: %s" % reply.get('message',''))
             logging.info("+++ DATETIME: %s" % reply['created_time'])
@@ -286,10 +327,10 @@ for post in posts:
                 logging.debug(like)
                 num_reactions += 1
 
-                #G.add_node('LIKE', type = 'reaction') # reaction
+                #G.add_node('LIKE', mtype = 'reaction') # reaction
                 G.add_node(
                     like['id'],
-                    type = 'user',
+                    mtype = 'user',
                     fid = like['id'],
                     label = like.get('name','__NA__'),
                     url = "https://facebook.com/%s" % like['id'],
@@ -297,16 +338,29 @@ for post in posts:
                 ) # user
 
                 #G.add_edge('LIKE', reply['id']) # reaction <--> comment
-                G.add_edge(like['id'], reply['id'], type = 'reacts to', reaction = 'LIKE') # user -|reacts to|> comment
+                G.add_edge(like['id'], reply['id'], mtype = 'reacts to', reaction = 'LIKE') # user -|reacts to|> comment
 
                 logging.info("+++ LIKE: %s" % like['name'])
 
+G.graph['since'] = min([
+    datetime.strptime(d['timestamp'].split('+')[0],fb_datetime_format)
+    for n,d in G.nodes(data=True)
+    if d['mtype'] == 'post'
+]).strftime(fb_datetime_format)
+
+G.graph['until'] = max([
+    datetime.strptime(d['timestamp'].split('+')[0],fb_datetime_format)
+    for n,d in G.nodes(data=True)
+    if d['mtype'] == 'post'
+]).strftime(fb_datetime_format)
+
+logging.info("Statistics from %s to %s" % (G.graph['since'], G.graph['until']))
 logging.info(
-    "Members: %d | Posts: %d | Reactions: %d | Comments: %d\nNodes: %d | Edges: %d" % (
-        len(filter(lambda (n, d): d['type'] == 'user', G.nodes(data=True))),
-        len(filter(lambda (n, d): d['type'] == 'post', G.nodes(data=True))),
-        len(filter(lambda (n1, n2, d): d['type'] == 'reacts to', G.edges(data=True))),
-        len(filter(lambda (n, d): d['type'] == 'comment', G.nodes(data=True))),
+    "Members: %d | Posts: %d | Reactions: %d | Comments: %d | Nodes: %d | Edges: %d" % (
+        len(filter(lambda (n, d): d['mtype'] == 'user', G.nodes(data=True))),
+        len(filter(lambda (n, d): d['mtype'] == 'post', G.nodes(data=True))),
+        len(filter(lambda (n1, n2, d): d['mtype'] == 'reacts to', G.edges(data=True))),
+        len(filter(lambda (n, d): d['mtype'] == 'comment', G.nodes(data=True))),
         G.number_of_nodes(),
         G.number_of_edges()
     )
@@ -314,22 +368,20 @@ logging.info(
 
 # node positioning algo
 # http://networkx.readthedocs.io/en/latest/reference/drawing.html
-pos = nx.spring_layout(G) # Fruchterman-Reingold
-nx.set_node_attributes( G , 'x' , {str(k): float(v[0]) for k,v in pos.items()} )
-nx.set_node_attributes( G , 'y' , {str(k): float(v[1]) for k,v in pos.items()} )
-
 try:
-    graph_type = config.get("Graph","graph_type")
+    if config.getboolean("Graph","calc_layout"):
+        pos = nx.spring_layout(G) # Fruchterman-Reingold
+        nx.set_node_attributes( G , 'x' , {str(k): float(v[0]) for k,v in pos.items()} )
+        nx.set_node_attributes( G , 'y' , {str(k): float(v[1]) for k,v in pos.items()} )
+except ImportError, e:
+    logging.warning(e)
 except ConfigParser.NoOptionError, e:
-    graph_type = "json"
+    pass
 
-try:
-    file_name = "%s_%s" % ( datetime.now().strftime("%Y%m%d%H%M") , config.get("Graph","file_name").split('.')[0] )
-except ConfigParser.NoOptionError, e:
-    file_name = "%s_%s" % ( datetime.now().strftime("%Y%m%d%H%M") , G.graph['name'] )
+# export also in gexf format, supported by gephi
+nx.write_gexf(G, file_name+".gexf")
 
 from networkx.readwrite import json_graph
-
 # node_link_data() sets links' target and source to nodes' indices in nodes array,
 # not to real nodes' ids... this workaround fix this issue
 json_data = json_graph.node_link_data(G)
@@ -339,7 +391,4 @@ for i,l in enumerate(json_data['links']):
 # end workaround
 with open(file_name+".json",'w') as f:
     json.dump(json_data, f)
-
-# export also in gexf format, supported by gephi
-nx.write_gexf(G, file_name+".gexf")
 

@@ -1,14 +1,27 @@
 [Auth]
-app_id: 
-app_secret: 
+# Facebook authentication for apps: https://developers.facebook.com/docs/facebook-login/access-tokens/
+# Your apps: https://developers.facebook.com/apps/
+# You can use an access token...
+access_token: ; Your app's access token
+# Or simpy both the app id and secret
+app_id: ; Your app id
+app_secret: ; Your app secret
 
 [Group]
-id: 
+# How to find group id: http://stackoverflow.com/a/33094493
+id: ; Id of the group you want to download
 
 [Datetime]
+# Format of next date and time options: http://strftime.org/
 #datetime_format: %%Y-%%m-%%d %%H:%%M:%%S
-#since_datetime: 
-#until_datetime: 
+# From time...
+#since_datetime: ; 
+# ... to time
+#until_datetime: ; 
 
 [Graph]
-#file_name = graph
+mode = archive ; Two modes: archive and update
+all_members = True ; All group members or only active ones in the time window
+calc_layout = False ; Apply force layout to find nodes' positions (numpy required)
+#file_name = graph ; Output file name, default it's the group name
+

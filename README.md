@@ -18,12 +18,19 @@ Edit `your_group_name.cnf` adding your `access_token` (or `app_id` and `app_secr
 You must create a Facebook App to obtain the first three parameters: https://developers.facebook.com/.
 If you don't know your group id, you can find it [in the source of the page](http://stackoverflow.com/a/33094493).
 
+You can choose between two modes: the `archive` one downloads all elements in the time window selected,
+the `update` one takes an existing gexf file and download only new elements since the last post found
+and until the `until_datetime` or now.
+
 Other optional options are `since_datetime` and `until_datetime` to narrow the time window and filter harvested posts.
 You can use your favorite format to write datetime, describing it in `datetime_format` option using the *strftime*
 syntax: http://strftime.org/. Please escape `%` char with another `%`, so use double `%%` (sic).
 
+You can also enable or disable two features: download of all members (and not only the active ones in the
+time window) with `all_members`, and layout computing ([Fruchterman-Reingold force-directed](http://networkx.github.io/documentation/development/reference/generated/networkx.drawing.layout.spring_layout.html) layout) with `calc_layout`.
+
 All harvested data will be saved in two files: `file_name`.gexf and `file_name`.json. You can customize `file_name` value,
-but the default value is {YYYYmmddHHMM}_{group name}.
+but the default value is `{YYYYmmddHHMM}_{group name}`.
 
 ## Usage
 
