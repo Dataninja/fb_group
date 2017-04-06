@@ -161,7 +161,7 @@ logging.info("Download graph from %s to %s" % ( since_datetime , until_datetime 
 posts = graph.get_all_connections(
     id = group_id,
     connection_name = "feed",
-    fields = "id,message,from,updated_time",
+    fields = "id,message,from,updated_time,to",
     since = int((since_datetime - datetime(1970, 1, 1)).total_seconds()),
     until = int((until_datetime - datetime(1970, 1, 1)).total_seconds())
 )
@@ -169,6 +169,7 @@ posts = graph.get_all_connections(
 num_posts = 0
 num_shares = 0
 num_reactions = 0
+num_mentions = 0
 num_comments = 0
 for post in posts:
 
@@ -211,6 +212,40 @@ for post in posts:
     logging.info("- POST: %s" % post.get('message',''))
     logging.info("+ DATETIME: %s" % post['updated_time'])
     logging.info("+ AUTHOR: %s" % post['from']['name'])
+
+    for mention in post.get('to',{}).get('data',[]):
+
+        logging.debug(mention)
+
+        if mention['id'] == group['id']:
+            continue
+
+        num_mentions += 1
+
+        if not nx.get_node_attributes(G, mention['id']):
+            G.add_node(
+                mention['id'],
+                mtype = 'user',
+                fid = mention['id'],
+                label = mention.get('name','__NA__'),
+                url = "https://facebook.com/%s" % mention['id'],
+                name = mention.get('name','__NA__'),
+                about = '__NA__',
+                age_range = "0 - 99",
+                birthyear = '__NA__',
+                birthday = '__NA__',
+                cover = '__NA__',
+                education = '__NA__',
+                email = '__NA__',
+                gender = '__NA__',
+                hometown = '__NA__',
+                is_verified = '__NA__',
+                work = '__NA__'
+            ) # user
+
+        G.add_edge(post['id'], mention['id'], mtype = 'mentions') # post -|mentions|> user
+
+        logging.info("++ MENTIONS: %s" % mention.get('name','__NA__'))
 
     shares = graph.get_all_connections(
         id = post['id'],
@@ -286,7 +321,8 @@ for post in posts:
 
     comments = graph.get_all_connections(
         id = post['id'],
-        connection_name = "comments"
+        connection_name = "comments",
+        fields = "id,message,from,created_time,message_tags"
     )
 
     for comment in comments:
@@ -344,6 +380,40 @@ for post in posts:
         logging.info("++ DATETIME: %s" % comment['created_time'])
         logging.info("++ AUTHOR: %s" % comment['from']['name'])
 
+        for mention in comment.get('message_tags',[]):
+
+            logging.debug(mention)
+
+            if mention['id'] == group['id']:
+                continue
+
+            num_mentions += 1
+
+            if not nx.get_node_attributes(G, mention['id']):
+                G.add_node(
+                    mention['id'],
+                    mtype = 'user',
+                    fid = mention['id'],
+                    label = mention.get('name','__NA__'),
+                    url = "https://facebook.com/%s" % mention['id'],
+                    name = mention.get('name','__NA__'),
+                    about = '__NA__',
+                    age_range = "0 - 99",
+                    birthyear = '__NA__',
+                    birthday = '__NA__',
+                    cover = '__NA__',
+                    education = '__NA__',
+                    email = '__NA__',
+                    gender = '__NA__',
+                    hometown = '__NA__',
+                    is_verified = '__NA__',
+                    work = '__NA__'
+                ) # user
+
+            G.add_edge(comment['id'], mention['id'], mtype = 'mentions') # comment -|mentions|> user
+
+            logging.info("++ MENTIONS: %s" % mention.get('name','__NA__'))
+
         comment_likes = graph.get_all_connections(
             id = comment['id'],
             connection_name = "likes"
@@ -381,7 +451,8 @@ for post in posts:
 
         replies = graph.get_all_connections(
             id = comment['id'],
-            connection_name = "comments"
+            connection_name = "comments",
+            fields = "id,message,from,created_time,message_tags"
         )
 
         for reply in replies:
@@ -426,6 +497,40 @@ for post in posts:
             logging.info("--- REPLY: %s" % reply.get('message',''))
             logging.info("+++ DATETIME: %s" % reply['created_time'])
             logging.info("+++ AUTHOR: %s" % reply['from']['name'])
+
+            for mention in reply.get('message_tags',[]):
+
+                logging.debug(mention)
+
+                if mention['id'] == group['id']:
+                    continue
+
+                num_mentions += 1
+
+                if not nx.get_node_attributes(G, mention['id']):
+                    G.add_node(
+                        mention['id'],
+                        mtype = 'user',
+                        fid = mention['id'],
+                        label = mention.get('name','__NA__'),
+                        url = "https://facebook.com/%s" % mention['id'],
+                        name = mention.get('name','__NA__'),
+                        about = '__NA__',
+                        age_range = "0 - 99",
+                        birthyear = '__NA__',
+                        birthday = '__NA__',
+                        cover = '__NA__',
+                        education = '__NA__',
+                        email = '__NA__',
+                        gender = '__NA__',
+                        hometown = '__NA__',
+                        is_verified = '__NA__',
+                        work = '__NA__'
+                    ) # user
+
+                G.add_edge(reply['id'], mention['id'], mtype = 'mentions') # comment -|mentions|> user
+
+                logging.info("++ MENTIONS: %s" % mention.get('name','__NA__'))
 
             reply_likes = graph.get_all_connections(
                 id = reply['id'],
@@ -477,11 +582,12 @@ G.graph['until'] = max([
 
 logging.info("Statistics from %s to %s" % (G.graph['since'], G.graph['until']))
 logging.info(
-        "Members: %d | Posts: %d | Reactions: %d | Shares: %d | Comments: %d | Nodes: %d | Edges: %d" % (
+        "Members: %d | Posts: %d | Reactions: %d | Shares: %d | Mentions: %d | Comments: %d | Nodes: %d | Edges: %d" % (
         len(filter(lambda (n, d): d['mtype'] == 'user', G.nodes(data=True))),
         len(filter(lambda (n, d): d['mtype'] == 'post', G.nodes(data=True))),
         len(filter(lambda (n1, n2, d): d['mtype'] == 'reacts to', G.edges(data=True))),
         num_shares,
+        len(filter(lambda (n1, n2, d): d['mtype'] == 'mentions', G.edges(data=True))),
         len(filter(lambda (n, d): d['mtype'] == 'comment', G.nodes(data=True))),
         G.number_of_nodes(),
         G.number_of_edges()

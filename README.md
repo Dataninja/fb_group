@@ -1,6 +1,6 @@
 # Facebook group harvester
 
-Download all data from a Facebook Group: posts, comments (and subcomments), likes, reactions, users, using the [official facebook-sdk module](https://github.com/mobolic/facebook-sdk/) for Python 2.7. WARNING! Under development, not all features are implemented or to be considered stable.
+Download all data from a Facebook Group: posts, comments (and subcomments), likes, reactions, users, shares and user mentions using the [official facebook-sdk module](https://github.com/mobolic/facebook-sdk/) for Python 2.7. WARNING! Under development, not all features are implemented or to be considered stable.
 
 ## Installation
 
@@ -44,10 +44,12 @@ Harvested data are organized in a graph structure:
   * user -|is author of|-> comment,
   * user -|reacts to|-> post,
   * user -|reacts to|-> comment
+  * post -|mentions|-> user
   * comment -|in reply to|-> post,
-  * comment -|in reply to|-> comment.
+  * comment -|in reply to|-> comment,
+  * comment -|mentions|-> user.
 
-There are three types of nodes and three types of edges. Nodes have additional attributes (ie. name of user, message for posts and comments). Only the -|reacts to|-> edge has an attribute, the [type of reaction](https://developers.facebook.com/docs/graph-api/reference/post/reactions) (LIKE, LOVE, WOW, HAHA, SAD, ANGRY, THANKFUL).
+There are three types of nodes and four types of edges. Nodes have additional attributes (ie. name of user, message for posts and comments). Only the -|reacts to|-> edge has an attribute, the [type of reaction](https://developers.facebook.com/docs/graph-api/reference/post/reactions) (LIKE, LOVE, WOW, HAHA, SAD, ANGRY, THANKFUL[, SHARE]).
 
 This graph is saved in two formats: [GEXF](https://networkx.github.io/documentation/development/reference/generated/networkx.readwrite.gexf.write_gexf.html#networkx.readwrite.gexf.write_gexf) and [JSON](https://networkx.github.io/documentation/development/reference/generated/networkx.readwrite.json_graph.node_link_data.html#networkx.readwrite.json_graph.node_link_data).
 
