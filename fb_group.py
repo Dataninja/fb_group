@@ -120,7 +120,7 @@ try:
         members = graph.get_all_connections(
             id = group_id,
             connection_name = "members",
-            fields = "id,name"
+            fields = "id,name,about,age_range,birthday,cover,education,email,gender,hometown,is_verified,work"
         )
     else:
         members = []
@@ -132,13 +132,26 @@ for member in members:
     logging.debug(member)
     num_members += 1
 
+    member_age_range = member.get('age_range',{})
+
     G.add_node(
         member['id'],
         mtype = 'user',
         fid = member['id'],
         label = member.get('name','__NA__'),
         url = "https://facebook.com/%s" % member['id'],
-        name = member.get('name','__NA__')
+        name = member.get('name','__NA__'),
+        about = member.get('about','__NA__'),
+        age_range = "%d - %d" % ( member_age_range.get('min',0) , member_age_range.get('max',99) ),
+        birthyear = member.get('birthday','__NA__/__NA__/__NA__').split('/')[-1],
+        birthday = member.get('birthday','__NA__'),
+        cover = member.get('cover',{}).get('source','__NA__'),
+        education = member.get('education',[{}])[0].get('degree',{}).get('link','__NA__'),
+        email = member.get('email','__NA__'),
+        gender = member.get('gender','__NA__'),
+        hometown = member.get('hometown',{}).get('link','__NA__'),
+        is_verified = member.get('is_verified','__NA__'),
+        work = member.get('work',[{}])[0].get('position',{}).get('link','__NA__')
     ) # user
 
     logging.info("- MEMBER: %s" % member['name'])
@@ -170,14 +183,27 @@ for post in posts:
         message = post.get('message',''),
         timestamp = post.get('updated_time','__NA__')
     ) # post
-    G.add_node(
-        post['from']['id'],
-        mtype = 'user',
-        fid = post['from']['id'],
-        label = post['from'].get('name','__NA__'),
-        url = "https://facebook.com/%s" % post['from']['id'],
-        name = post['from'].get('name','__NA__')
-    ) # user
+
+    if not nx.get_node_attributes(G, post['from']['id']):
+        G.add_node(
+            post['from']['id'],
+            mtype = 'user',
+            fid = post['from']['id'],
+            label = post['from'].get('name','__NA__'),
+            url = "https://facebook.com/%s" % post['from']['id'],
+            name = post['from'].get('name','__NA__'),
+            about = '__NA__',
+            age_range = "0 - 99",
+            birthyear = '__NA__',
+            birthday = '__NA__',
+            cover = '__NA__',
+            education = '__NA__',
+            email = '__NA__',
+            gender = '__NA__',
+            hometown = '__NA__',
+            is_verified = '__NA__',
+            work = '__NA__'
+        ) # user
 
     G.add_edge(post['from']['id'], post['id'], mtype = 'is author of') # user -|is author of|> post
 
@@ -195,15 +221,26 @@ for post in posts:
         logging.debug(reaction)
         num_reactions += 1
 
-        #G.add_node(reaction['type'], mtype = 'reaction') # reaction
-        G.add_node(
-            reaction['id'],
-            mtype = 'user',
-            fid = reaction['id'],
-            label = reaction.get('name','__NA__'),
-            url = "https://facebook.com/%s" % reaction['id'],
-            name = reaction.get('name','__NA__')
-        ) # user
+        if not nx.get_node_attributes(G, reaction['id']):
+            G.add_node(
+                reaction['id'],
+                mtype = 'user',
+                fid = reaction['id'],
+                label = reaction.get('name','__NA__'),
+                url = "https://facebook.com/%s" % reaction['id'],
+                name = reaction.get('name','__NA__'),
+                about = '__NA__',
+                age_range = "0 - 99",
+                birthyear = '__NA__',
+                birthday = '__NA__',
+                cover = '__NA__',
+                education = '__NA__',
+                email = '__NA__',
+                gender = '__NA__',
+                hometown = '__NA__',
+                is_verified = '__NA__',
+                work = '__NA__'
+            ) # user
 
         #G.add_edge(reaction['type'], post['id']) # reaction <--> post
         G.add_edge(reaction['id'], post['id'], mtype = 'reacts to', reaction = reaction['type']) # user -|reacts to|> post
@@ -241,14 +278,27 @@ for post in posts:
             message = comment.get('message',''),
             timestamp = comment.get('created_time','__NA__')
         ) # comment
-        G.add_node(
-            comment['from']['id'],
-            mtype = 'user',
-            fid = comment['from']['id'],
-            label = comment['from'].get('name','__NA__'),
-            url = "https://facebook.com/%s" % comment['from']['id'],
-            name = comment['from'].get('name','__NA__')
-        ) # user
+
+        if not nx.get_node_attributes(G, comment['from']['id']):
+            G.add_node(
+                comment['from']['id'],
+                mtype = 'user',
+                fid = comment['from']['id'],
+                label = comment['from'].get('name','__NA__'),
+                url = "https://facebook.com/%s" % comment['from']['id'],
+                name = comment['from'].get('name','__NA__'),
+                about = '__NA__',
+                age_range = "0 - 99",
+                birthyear = '__NA__',
+                birthday = '__NA__',
+                cover = '__NA__',
+                education = '__NA__',
+                email = '__NA__',
+                gender = '__NA__',
+                hometown = '__NA__',
+                is_verified = '__NA__',
+                work = '__NA__'
+            ) # user
 
         G.add_edge(comment['id'], post['id'], mtype = 'in reply to') # comment -|in reply to|> post
         G.add_edge(comment['from']['id'], comment['id'], mtype = 'is author of') # user -|is author of|> comment
@@ -267,17 +317,27 @@ for post in posts:
             logging.debug(like)
             num_reactions += 1
 
-            #G.add_node('LIKE', mtype = 'reaction') # reaction
-            G.add_node(
-                like['id'],
-                mtype = 'user',
-                fid = like['id'],
-                label = like.get('name','__NA__'),
-                url = "https://facebook.com/%s" % like['id'],
-                name = like.get('name','__NA__')
-            ) # user
+            if not nx.get_node_attributes(G, like['id']):
+                G.add_node(
+                    like['id'],
+                    mtype = 'user',
+                    fid = like['id'],
+                    label = like.get('name','__NA__'),
+                    url = "https://facebook.com/%s" % like['id'],
+                    name = like.get('name','__NA__'),
+                    about = '__NA__',
+                    age_range = "0 - 99",
+                    birthyear = '__NA__',
+                    birthday = '__NA__',
+                    cover = '__NA__',
+                    education = '__NA__',
+                    email = '__NA__',
+                    gender = '__NA__',
+                    hometown = '__NA__',
+                    is_verified = '__NA__',
+                    work = '__NA__'
+                ) # user
 
-            #G.add_edge('LIKE', comment['id']) # reaction <--> comment
             G.add_edge(like['id'], comment['id'], mtype = 'reacts to', reaction = 'LIKE') # user -|reacts to|> comment
 
             logging.info("++ LIKE: %s" % like['name'])
@@ -301,14 +361,27 @@ for post in posts:
                 message = reply.get('message',''),
                 timestamp = reply.get('created_time','__NA__')
             ) # comment
-            G.add_node(
-                reply['from']['id'],
-                mtype = 'user',
-                fid = reply['from']['id'],
-                label = reply['from'].get('name','__NA__'),
-                url = "https://facebook.com/%s" % reply['from']['id'],
-                name = reply['from'].get('name','__NA__')
-            ) # user
+
+            if not nx.get_node_attributes(G, reply['from']['id']):
+                G.add_node(
+                    reply['from']['id'],
+                    mtype = 'user',
+                    fid = reply['from']['id'],
+                    label = reply['from'].get('name','__NA__'),
+                    url = "https://facebook.com/%s" % reply['from']['id'],
+                    name = reply['from'].get('name','__NA__'),
+                    about = '__NA__',
+                    age_range = "0 - 99",
+                    birthyear = '__NA__',
+                    birthday = '__NA__',
+                    cover = '__NA__',
+                    education = '__NA__',
+                    email = '__NA__',
+                    gender = '__NA__',
+                    hometown = '__NA__',
+                    is_verified = '__NA__',
+                    work = '__NA__'
+                ) # user
 
             G.add_edge(reply['id'], comment['id'], mtype = 'in reply to') # comment -|in reply to|> comment
             G.add_edge(reply['from']['id'], reply['id'], mtype = 'is author of') # user -|is author of|> comment
@@ -327,15 +400,26 @@ for post in posts:
                 logging.debug(like)
                 num_reactions += 1
 
-                #G.add_node('LIKE', mtype = 'reaction') # reaction
-                G.add_node(
-                    like['id'],
-                    mtype = 'user',
-                    fid = like['id'],
-                    label = like.get('name','__NA__'),
-                    url = "https://facebook.com/%s" % like['id'],
-                    name = like.get('name','__NA__')
-                ) # user
+                if not nx.get_node_attributes(G, like['id']):
+                    G.add_node(
+                        like['id'],
+                        mtype = 'user',
+                        fid = like['id'],
+                        label = like.get('name','__NA__'),
+                        url = "https://facebook.com/%s" % like['id'],
+                        name = like.get('name','__NA__'),
+                        about = '__NA__',
+                        age_range = "0 - 99",
+                        birthyear = '__NA__',
+                        birthday = '__NA__',
+                        cover = '__NA__',
+                        education = '__NA__',
+                        email = '__NA__',
+                        gender = '__NA__',
+                        hometown = '__NA__',
+                        is_verified = '__NA__',
+                        work = '__NA__'
+                    ) # user
 
                 #G.add_edge('LIKE', reply['id']) # reaction <--> comment
                 G.add_edge(like['id'], reply['id'], mtype = 'reacts to', reaction = 'LIKE') # user -|reacts to|> comment
