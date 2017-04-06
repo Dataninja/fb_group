@@ -167,6 +167,7 @@ posts = graph.get_all_connections(
 )
 
 num_posts = 0
+num_shares = 0
 num_reactions = 0
 num_comments = 0
 for post in posts:
@@ -210,6 +211,42 @@ for post in posts:
     logging.info("- POST: %s" % post.get('message',''))
     logging.info("+ DATETIME: %s" % post['updated_time'])
     logging.info("+ AUTHOR: %s" % post['from']['name'])
+
+    shares = graph.get_all_connections(
+        id = post['id'],
+        connection_name = "sharedposts",
+        fields = "id,from"
+    )
+
+    for share in shares:
+
+        logging.debug(share)
+        num_shares += 1
+
+        if not nx.get_node_attributes(G, share['from']['id']):
+            G.add_node(
+                share['from']['id'],
+                mtype = 'user',
+                fid = share['from']['id'],
+                label = share['from'].get('name','__NA__'),
+                url = "https://facebook.com/%s" % share['from']['id'],
+                name = share['from'].get('name','__NA__'),
+                about = '__NA__',
+                age_range = "0 - 99",
+                birthyear = '__NA__',
+                birthday = '__NA__',
+                cover = '__NA__',
+                education = '__NA__',
+                email = '__NA__',
+                gender = '__NA__',
+                hometown = '__NA__',
+                is_verified = '__NA__',
+                work = '__NA__'
+            ) # user
+
+        G.add_edge(share['from']['id'], post['id'], mtype = 'reacts to', reaction = 'SHARE') # user -|reacts to|> post
+
+        logging.info("++ SHARE: %s" % share['from']['name'])
 
     post_reactions = graph.get_all_connections(
         id = post['id'],
@@ -386,7 +423,7 @@ for post in posts:
             G.add_edge(reply['id'], comment['id'], mtype = 'in reply to') # comment -|in reply to|> comment
             G.add_edge(reply['from']['id'], reply['id'], mtype = 'is author of') # user -|is author of|> comment
 
-            logging.info("--- reply: %s" % reply.get('message',''))
+            logging.info("--- REPLY: %s" % reply.get('message',''))
             logging.info("+++ DATETIME: %s" % reply['created_time'])
             logging.info("+++ AUTHOR: %s" % reply['from']['name'])
 
@@ -440,10 +477,11 @@ G.graph['until'] = max([
 
 logging.info("Statistics from %s to %s" % (G.graph['since'], G.graph['until']))
 logging.info(
-    "Members: %d | Posts: %d | Reactions: %d | Comments: %d | Nodes: %d | Edges: %d" % (
+        "Members: %d | Posts: %d | Reactions: %d | Shares: %d | Comments: %d | Nodes: %d | Edges: %d" % (
         len(filter(lambda (n, d): d['mtype'] == 'user', G.nodes(data=True))),
         len(filter(lambda (n, d): d['mtype'] == 'post', G.nodes(data=True))),
         len(filter(lambda (n1, n2, d): d['mtype'] == 'reacts to', G.edges(data=True))),
+        num_shares,
         len(filter(lambda (n, d): d['mtype'] == 'comment', G.nodes(data=True))),
         G.number_of_nodes(),
         G.number_of_edges()
