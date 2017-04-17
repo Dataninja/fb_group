@@ -1,10 +1,46 @@
 # -*- coding: utf-8 -*-
-import facebook, logging, ConfigParser, sys, json
+import facebook, logging, ConfigParser, sys, json, re
 logging.basicConfig(level=logging.INFO)
 from datetime import datetime
 import networkx as nx
 
 fb_datetime_format = "%Y-%m-%dT%H:%M:%S" # 2017-03-21T14:18:11+0000
+fb_hashtag_regex = re.compile("#(?:\[[^\]]+\]|\S+)")
+fb_url_regex = re.compile(
+    #u"^"
+    # protocol identifier
+    u"(?:(?:https?|ftp)://)"
+    # user:pass authentication
+    u"(?:\S+(?::\S*)?@)?"
+    u"(?:"
+    # IP address exclusion
+    # private & local networks
+    u"(?!(?:10|127)(?:\.\d{1,3}){3})"
+    u"(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})"
+    u"(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})"
+    # IP address dotted notation octets
+    # excludes loopback network 0.0.0.0
+    # excludes reserved space >= 224.0.0.0
+    # excludes network & broadcast addresses
+    # (first & last IP address of each class)
+    u"(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])"
+    u"(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}"
+    u"(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))"
+    u"|"
+    # host name
+    u"(?:(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)"
+    # domain name
+    u"(?:\.(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)*"
+    # TLD identifier
+    u"(?:\.(?:[a-z\u00a1-\uffff]{2,}))"
+    u")"
+    # port number
+    u"(?::\d{2,5})?"
+    # resource path
+    u"(?:/\S*)?"
+    #u"$"
+    , re.UNICODE
+)
 
 if len(sys.argv) > 1:
     config_file = sys.argv[1]
@@ -161,7 +197,7 @@ logging.info("Download graph from %s to %s" % ( since_datetime , until_datetime 
 posts = graph.get_all_connections(
     id = group_id,
     connection_name = "feed",
-    fields = "id,message,from,updated_time,to",
+    fields = "id,message,from,updated_time,to,link",
     since = int((since_datetime - datetime(1970, 1, 1)).total_seconds()),
     until = int((until_datetime - datetime(1970, 1, 1)).total_seconds())
 )
@@ -183,6 +219,8 @@ for post in posts:
         label = post.get('message','')[0:12]+'...',
         url = "https://facebook.com/%s/posts/%s" % (post['from']['id'], post['id'].split('_')[1]),
         message = post.get('message',''),
+        hashtags = json.dumps(re.findall(fb_hashtag_regex, post.get('message',''))),
+        links = json.dumps(re.findall(fb_url_regex, post.get('message','')) + ([post['link']] if 'link' in post else [])),
         timestamp = post.get('updated_time','__NA__')
     ) # post
 
@@ -349,6 +387,8 @@ for post in posts:
             label = comment.get('message','')[0:12]+'...',
             url = "https://facebook.com/%s/posts/%s/?comment_id=%s" % (post['from']['id'], post['id'].split('_')[1], comment['id']),
             message = comment.get('message',''),
+            hashtags = json.dumps(re.findall(fb_hashtag_regex, comment.get('message',''))),
+            links = json.dumps(re.findall(fb_url_regex, comment.get('message',''))),
             timestamp = comment.get('created_time','__NA__')
         ) # comment
 
@@ -467,6 +507,8 @@ for post in posts:
                 label = reply.get('message','')[0:12]+'...',
                 url = "https://facebook.com/%s/posts/%s/?comment_id=%s" % (post['from']['id'], post['id'].split('_')[1], reply['id']),
                 message = reply.get('message',''),
+                hashtags = json.dumps(re.findall(fb_hashtag_regex, reply.get('message',''))),
+                links = json.dumps(re.findall(fb_url_regex, reply.get('message',''))),
                 timestamp = reply.get('created_time','__NA__')
             ) # comment
 
