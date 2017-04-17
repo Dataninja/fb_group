@@ -5,7 +5,7 @@ from datetime import datetime
 import networkx as nx
 
 fb_datetime_format = "%Y-%m-%dT%H:%M:%S" # 2017-03-21T14:18:11+0000
-fb_hashtag_regex = re.compile("#(?:\[[^\]]+\]|\S+)")
+fb_hashtag_regex = re.compile( "#(?:\[[^\]]+\]|\S+)" )
 fb_url_regex = re.compile(
     #u"^"
     # protocol identifier
@@ -33,7 +33,7 @@ fb_url_regex = re.compile(
     u"(?:\.(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)*"
     # TLD identifier
     u"(?:\.(?:[a-z\u00a1-\uffff]{2,}))"
-    u")"
+    u" )"
     # port number
     u"(?::\d{2,5})?"
     # resource path
@@ -45,26 +45,26 @@ fb_url_regex = re.compile(
 if len(sys.argv) > 1:
     config_file = sys.argv[1]
 else:
-    logging.error("Please provide a configuration file.")
+    logging.error( "Please provide a configuration file." )
     exit()
 
 config = ConfigParser.SafeConfigParser()
 try:
     config.read(config_file)
 except Exception, e:
-    logging.error("Provided configuration file is missing or wrong.")
+    logging.error( "Provided configuration file is missing or wrong." )
     exit()
 
 try:
-    access_token = config.get("Auth","access_token")
+    access_token = config.get( "Auth" , "access_token" )
 except ConfigParser.NoOptionError, e:
-    logging.warning("Missing access_token, I'll try to use app_id and app_secret instead.")
+    logging.warning( "Missing access_token, I'll try to use app_id and app_secret instead." )
     try:
-        app_id = config.get("Auth","app_id")
-        app_secret = config.get("Auth","app_secret")
+        app_id = config.get( "Auth" , "app_id" )
+        app_secret = config.get( "Auth" , "app_secret" )
         access_token = "%s|%s" % ( app_id , app_secret )
     except ConfigParser.NoOptionError, e:
-        logging.error("No auth token provided.")
+        logging.error( "No auth token provided." )
         exit()
 
 graph = facebook.GraphAPI(
@@ -73,9 +73,9 @@ graph = facebook.GraphAPI(
 )
 
 try:
-    group_id = config.get("Group","id")
+    group_id = config.get( "Group" , "id" )
 except ConfigParser.NoOptionError, e:
-    logging.error("No group id provided.")
+    logging.error( "No group id provided." )
     exit()
 
 try:
@@ -83,24 +83,24 @@ try:
         id = group_id,
         fields = "id,name,updated_time"
     )
-    logging.info("Group: %s" % group['name'])
+    logging.info( "Group: %s" % group['name'] )
 except facebook.GraphAPIError, e:
-    logging.error("Errors during connections to Facebook Graph API: %s." % e)
+    logging.error( "Errors during connections to Facebook Graph API: %s." % e )
     exit()
 
 try:
-    datetime_format = config.get("Datetime","datetime_format")
+    datetime_format = config.get( "Datetime" , "datetime_format" )
 except ConfigParser.NoOptionError, e:
     datetime_format = "%Y-%m-%d %H:%M:%S"
 
 try:
-    mode = config.get("Graph","mode")
+    mode = config.get( "Graph" , "mode" )
 except ConfigParser.NoOptionError, e:
     mode = "archive"
 
 try:
     until_datetime = datetime.strptime(
-        config.get("Datetime","until_datetime"),
+        config.get( "Datetime" , "until_datetime" ),
         datetime_format
     )
 except ConfigParser.NoOptionError, e:
@@ -109,9 +109,9 @@ except ConfigParser.NoOptionError, e:
 if mode == "update":
 
     try:
-        file_name = config.get("Graph","file_name").split('.')[0]
+        file_name = config.get( "Graph" , "file_name" ).split('.')[0]
     except ConfigParser.NoOptionError, e:
-        logging.error("Please provide a valid graph file in update mode.")
+        logging.error( "Please provide a valid graph file in update mode." )
         exit()
 
     G = nx.read_gexf(file_name+'.gexf')
@@ -129,9 +129,9 @@ if mode == "update":
 else:
 
     try:
-        file_name = "%s_%s" % ( datetime.now().strftime("%Y%m%d%H%M") , config.get("Graph","file_name").split('.')[0] )
+        file_name = "%s_%s" % ( datetime.now().strftime( "%Y%m%d%H%M" ) , config.get( "Graph" , "file_name" ).split('.')[0] )
     except ConfigParser.NoOptionError, e:
-        file_name = "%s_%s" % ( datetime.now().strftime("%Y%m%d%H%M") , group['name'] )
+        file_name = "%s_%s" % ( datetime.now().strftime( "%Y%m%d%H%M" ) , group['name'] )
 
     G = nx.DiGraph()
 
@@ -141,7 +141,7 @@ else:
 
     try:
         since_datetime = datetime.strptime(
-            config.get("Datetime","since_datetime"),
+            config.get( "Datetime" , "since_datetime" ),
             datetime_format
         )
     except ConfigParser.NoOptionError, e:
@@ -152,7 +152,7 @@ G.graph['last_update'] = datetime.now().strftime(fb_datetime_format)
 # Group members: https://developers.facebook.com/docs/graph-api/reference/v2.8/group/members
 num_members = 0
 try:
-    if config.getboolean("Graph","all_members"):
+    if config.getboolean( "Graph" , "all_members" ):
         members = graph.get_all_connections(
             id = group_id,
             connection_name = "members",
@@ -163,36 +163,77 @@ try:
 except ConfigParser.NoOptionError, e:
     members = []
 
+
+def add_user(graph, user):
+
+    user_age_range = user.get('age_range',{})
+
+    graph.add_node(
+        user['id'],
+        mtype = 'user',
+        fid = user['id'],
+        label = user.get('name','__NA__'),
+        url = "https://facebook.com/%s" % user['id'],
+        name = user.get('name','__NA__'),
+        about = user.get('about','__NA__'),
+        age_range = "%d - %d" % ( user_age_range.get('min',0) , user_age_range.get('max',99) ),
+        birthyear = user.get('birthday','__NA__/__NA__/__NA__').split('/')[-1],
+        birthday = user.get('birthday','__NA__'),
+        cover = user.get('cover',{}).get('source','__NA__'),
+        education = user.get('education',[{}])[0].get('degree',{}).get('link','__NA__'),
+        email = user.get('email','__NA__'),
+        gender = user.get('gender','__NA__'),
+        hometown = user.get('hometown',{}).get('link','__NA__'),
+        is_verified = user.get('is_verified','__NA__'),
+        work = user.get('work',[{}])[0].get('position',{}).get('link','__NA__')
+    ) # user
+
+def add_post(graph, post):
+
+    graph.add_node(
+        post['id'],
+        mtype = 'post',
+        fid = post['id'],
+        label = post.get('message','')[0:12]+'...',
+        url = "https://facebook.com/%s/posts/%s" % (
+            post['from']['id'],
+            post['id'].split('_')[1]
+        ),
+        message = post.get('message',''),
+        hashtags = json.dumps(re.findall( fb_hashtag_regex , post.get('message','') )),
+        links = json.dumps(re.findall( fb_url_regex , post.get('message','') ) + ([post['link']] if 'link' in post else [])),
+        timestamp = post.get('updated_time','__NA__')
+    ) # post
+
+def add_comment(graph, comment, post):
+
+    graph.add_node(
+        comment['id'],
+        mtype = 'comment',
+        fid = comment['id'],
+        label = comment.get('message','')[0:12]+'...',
+        url = "https://facebook.com/%s/posts/%s/?comment_id=%s" % (
+            post['from']['id'],
+            post['id'].split('_')[1],
+            comment['id']
+        ),
+        message = comment.get('message',''),
+        hashtags = json.dumps(re.findall( fb_hashtag_regex , comment.get('message','') )),
+        links = json.dumps(re.findall( fb_url_regex , comment.get('message','') )),
+        timestamp = comment.get('created_time','__NA__')
+    ) # comment
+
+
 for member in members:
 
     logging.debug(member)
     num_members += 1
 
-    member_age_range = member.get('age_range',{})
+    add_user(G,member)
 
-    G.add_node(
-        member['id'],
-        mtype = 'user',
-        fid = member['id'],
-        label = member.get('name','__NA__'),
-        url = "https://facebook.com/%s" % member['id'],
-        name = member.get('name','__NA__'),
-        about = member.get('about','__NA__'),
-        age_range = "%d - %d" % ( member_age_range.get('min',0) , member_age_range.get('max',99) ),
-        birthyear = member.get('birthday','__NA__/__NA__/__NA__').split('/')[-1],
-        birthday = member.get('birthday','__NA__'),
-        cover = member.get('cover',{}).get('source','__NA__'),
-        education = member.get('education',[{}])[0].get('degree',{}).get('link','__NA__'),
-        email = member.get('email','__NA__'),
-        gender = member.get('gender','__NA__'),
-        hometown = member.get('hometown',{}).get('link','__NA__'),
-        is_verified = member.get('is_verified','__NA__'),
-        work = member.get('work',[{}])[0].get('position',{}).get('link','__NA__')
-    ) # user
+    logging.info( "- MEMBER: %s" % member['name'])
 
-    logging.info("- MEMBER: %s" % member['name'])
-
-logging.info("Download graph from %s to %s" % ( since_datetime , until_datetime ))
+logging.info( "Download graph from %s to %s" % ( since_datetime , until_datetime ))
 
 posts = graph.get_all_connections(
     id = group_id,
@@ -212,44 +253,20 @@ for post in posts:
     logging.debug(post)
     num_posts += 1
 
-    G.add_node(
+    add_post( G , post )
+
+    if not nx.get_node_attributes( G , post['from']['id'] ):
+        add_user( G , post['from'] )
+
+    G.add_edge(
+        post['from']['id'],
         post['id'],
-        mtype = 'post',
-        fid = post['id'],
-        label = post.get('message','')[0:12]+'...',
-        url = "https://facebook.com/%s/posts/%s" % (post['from']['id'], post['id'].split('_')[1]),
-        message = post.get('message',''),
-        hashtags = json.dumps(re.findall(fb_hashtag_regex, post.get('message',''))),
-        links = json.dumps(re.findall(fb_url_regex, post.get('message','')) + ([post['link']] if 'link' in post else [])),
-        timestamp = post.get('updated_time','__NA__')
-    ) # post
+        mtype = 'is author of'
+    ) # user -|is author of|> post
 
-    if not nx.get_node_attributes(G, post['from']['id']):
-        G.add_node(
-            post['from']['id'],
-            mtype = 'user',
-            fid = post['from']['id'],
-            label = post['from'].get('name','__NA__'),
-            url = "https://facebook.com/%s" % post['from']['id'],
-            name = post['from'].get('name','__NA__'),
-            about = '__NA__',
-            age_range = "0 - 99",
-            birthyear = '__NA__',
-            birthday = '__NA__',
-            cover = '__NA__',
-            education = '__NA__',
-            email = '__NA__',
-            gender = '__NA__',
-            hometown = '__NA__',
-            is_verified = '__NA__',
-            work = '__NA__'
-        ) # user
-
-    G.add_edge(post['from']['id'], post['id'], mtype = 'is author of') # user -|is author of|> post
-
-    logging.info("- POST: %s" % post.get('message',''))
-    logging.info("+ DATETIME: %s" % post['updated_time'])
-    logging.info("+ AUTHOR: %s" % post['from']['name'])
+    logging.info( "- POST: %s" % post.get('message','') )
+    logging.info( "+ DATETIME: %s" % post['updated_time'] )
+    logging.info( "+ AUTHOR: %s" % post['from']['name'] )
 
     for mention in post.get('to',{}).get('data',[]):
 
@@ -260,30 +277,16 @@ for post in posts:
 
         num_mentions += 1
 
-        if not nx.get_node_attributes(G, mention['id']):
-            G.add_node(
-                mention['id'],
-                mtype = 'user',
-                fid = mention['id'],
-                label = mention.get('name','__NA__'),
-                url = "https://facebook.com/%s" % mention['id'],
-                name = mention.get('name','__NA__'),
-                about = '__NA__',
-                age_range = "0 - 99",
-                birthyear = '__NA__',
-                birthday = '__NA__',
-                cover = '__NA__',
-                education = '__NA__',
-                email = '__NA__',
-                gender = '__NA__',
-                hometown = '__NA__',
-                is_verified = '__NA__',
-                work = '__NA__'
-            ) # user
+        if not nx.get_node_attributes( G , mention['id'] ):
+            add_user( G , mention )
 
-        G.add_edge(post['id'], mention['id'], mtype = 'mentions') # post -|mentions|> user
+        G.add_edge(
+            post['id'],
+            mention['id'],
+            mtype = 'mentions'
+        ) # post -|mentions|> user
 
-        logging.info("++ MENTIONS: %s" % mention.get('name','__NA__'))
+        logging.info( "++ MENTIONS: %s" % mention.get('name','__NA__') )
 
     shares = graph.get_all_connections(
         id = post['id'],
@@ -296,30 +299,17 @@ for post in posts:
         logging.debug(share)
         num_shares += 1
 
-        if not nx.get_node_attributes(G, share['from']['id']):
-            G.add_node(
-                share['from']['id'],
-                mtype = 'user',
-                fid = share['from']['id'],
-                label = share['from'].get('name','__NA__'),
-                url = "https://facebook.com/%s" % share['from']['id'],
-                name = share['from'].get('name','__NA__'),
-                about = '__NA__',
-                age_range = "0 - 99",
-                birthyear = '__NA__',
-                birthday = '__NA__',
-                cover = '__NA__',
-                education = '__NA__',
-                email = '__NA__',
-                gender = '__NA__',
-                hometown = '__NA__',
-                is_verified = '__NA__',
-                work = '__NA__'
-            ) # user
+        if not nx.get_node_attributes( G , share['from']['id'] ):
+            add_user( G , share['from'] )
 
-        G.add_edge(share['from']['id'], post['id'], mtype = 'reacts to', reaction = 'SHARE') # user -|reacts to|> post
+        G.add_edge(
+            share['from']['id'],
+            post['id'],
+            mtype = 'reacts to',
+            reaction = 'SHARE'
+        ) # user -|reacts to|> post
 
-        logging.info("++ SHARE: %s" % share['from']['name'])
+        logging.info( "++ SHARE: %s" % share['from']['name'] )
 
     post_reactions = graph.get_all_connections(
         id = post['id'],
@@ -331,31 +321,17 @@ for post in posts:
         logging.debug(reaction)
         num_reactions += 1
 
-        if not nx.get_node_attributes(G, reaction['id']):
-            G.add_node(
-                reaction['id'],
-                mtype = 'user',
-                fid = reaction['id'],
-                label = reaction.get('name','__NA__'),
-                url = "https://facebook.com/%s" % reaction['id'],
-                name = reaction.get('name','__NA__'),
-                about = '__NA__',
-                age_range = "0 - 99",
-                birthyear = '__NA__',
-                birthday = '__NA__',
-                cover = '__NA__',
-                education = '__NA__',
-                email = '__NA__',
-                gender = '__NA__',
-                hometown = '__NA__',
-                is_verified = '__NA__',
-                work = '__NA__'
-            ) # user
+        if not nx.get_node_attributes( G , reaction['id'] ):
+            add_user( G , reaction )
 
-        #G.add_edge(reaction['type'], post['id']) # reaction <--> post
-        G.add_edge(reaction['id'], post['id'], mtype = 'reacts to', reaction = reaction['type']) # user -|reacts to|> post
+        G.add_edge(
+            reaction['id'],
+            post['id'],
+            mtype = 'reacts to',
+            reaction = reaction['type']
+        ) # user -|reacts to|> post
 
-        logging.info("+ %s: %s" % ( reaction['type'] , reaction['name']))
+        logging.info( "+ %s: %s" % ( reaction['type'] , reaction['name'] ) )
 
     comments = graph.get_all_connections(
         id = post['id'],
@@ -380,45 +356,26 @@ for post in posts:
 
         num_comments += 1
 
-        G.add_node(
+        add_comment( G , comment , post )
+
+        if not nx.get_node_attributes( G , comment['from']['id'] ):
+            add_user( G , comment['from'] )
+
+        G.add_edge(
             comment['id'],
-            mtype = 'comment',
-            fid = comment['id'],
-            label = comment.get('message','')[0:12]+'...',
-            url = "https://facebook.com/%s/posts/%s/?comment_id=%s" % (post['from']['id'], post['id'].split('_')[1], comment['id']),
-            message = comment.get('message',''),
-            hashtags = json.dumps(re.findall(fb_hashtag_regex, comment.get('message',''))),
-            links = json.dumps(re.findall(fb_url_regex, comment.get('message',''))),
-            timestamp = comment.get('created_time','__NA__')
-        ) # comment
+            post['id'],
+            mtype = 'in reply to'
+        ) # comment -|in reply to|> post
 
-        if not nx.get_node_attributes(G, comment['from']['id']):
-            G.add_node(
-                comment['from']['id'],
-                mtype = 'user',
-                fid = comment['from']['id'],
-                label = comment['from'].get('name','__NA__'),
-                url = "https://facebook.com/%s" % comment['from']['id'],
-                name = comment['from'].get('name','__NA__'),
-                about = '__NA__',
-                age_range = "0 - 99",
-                birthyear = '__NA__',
-                birthday = '__NA__',
-                cover = '__NA__',
-                education = '__NA__',
-                email = '__NA__',
-                gender = '__NA__',
-                hometown = '__NA__',
-                is_verified = '__NA__',
-                work = '__NA__'
-            ) # user
+        G.add_edge(
+            comment['from']['id'],
+            comment['id'],
+            mtype = 'is author of'
+        ) # user -|is author of|> comment
 
-        G.add_edge(comment['id'], post['id'], mtype = 'in reply to') # comment -|in reply to|> post
-        G.add_edge(comment['from']['id'], comment['id'], mtype = 'is author of') # user -|is author of|> comment
-
-        logging.info("-- COMMENT: %s" % comment.get('message',''))
-        logging.info("++ DATETIME: %s" % comment['created_time'])
-        logging.info("++ AUTHOR: %s" % comment['from']['name'])
+        logging.info( "-- COMMENT: %s" % comment.get('message','') )
+        logging.info( "++ DATETIME: %s" % comment['created_time'] )
+        logging.info( "++ AUTHOR: %s" % comment['from']['name'] )
 
         for mention in comment.get('message_tags',[]):
 
@@ -429,30 +386,16 @@ for post in posts:
 
             num_mentions += 1
 
-            if not nx.get_node_attributes(G, mention['id']):
-                G.add_node(
-                    mention['id'],
-                    mtype = 'user',
-                    fid = mention['id'],
-                    label = mention.get('name','__NA__'),
-                    url = "https://facebook.com/%s" % mention['id'],
-                    name = mention.get('name','__NA__'),
-                    about = '__NA__',
-                    age_range = "0 - 99",
-                    birthyear = '__NA__',
-                    birthday = '__NA__',
-                    cover = '__NA__',
-                    education = '__NA__',
-                    email = '__NA__',
-                    gender = '__NA__',
-                    hometown = '__NA__',
-                    is_verified = '__NA__',
-                    work = '__NA__'
-                ) # user
+            if not nx.get_node_attributes( G , mention['id'] ):
+                add_user( G , mention )
 
-            G.add_edge(comment['id'], mention['id'], mtype = 'mentions') # comment -|mentions|> user
+            G.add_edge(
+                comment['id'],
+                mention['id'],
+                mtype = 'mentions'
+            ) # comment -|mentions|> user
 
-            logging.info("++ MENTIONS: %s" % mention.get('name','__NA__'))
+            logging.info( "++ MENTIONS: %s" % mention.get('name','__NA__') )
 
         comment_likes = graph.get_all_connections(
             id = comment['id'],
@@ -464,30 +407,17 @@ for post in posts:
             logging.debug(like)
             num_reactions += 1
 
-            if not nx.get_node_attributes(G, like['id']):
-                G.add_node(
-                    like['id'],
-                    mtype = 'user',
-                    fid = like['id'],
-                    label = like.get('name','__NA__'),
-                    url = "https://facebook.com/%s" % like['id'],
-                    name = like.get('name','__NA__'),
-                    about = '__NA__',
-                    age_range = "0 - 99",
-                    birthyear = '__NA__',
-                    birthday = '__NA__',
-                    cover = '__NA__',
-                    education = '__NA__',
-                    email = '__NA__',
-                    gender = '__NA__',
-                    hometown = '__NA__',
-                    is_verified = '__NA__',
-                    work = '__NA__'
-                ) # user
+            if not nx.get_node_attributes( G , like['id'] ):
+                add_user( G , like )
 
-            G.add_edge(like['id'], comment['id'], mtype = 'reacts to', reaction = 'LIKE') # user -|reacts to|> comment
+            G.add_edge(
+                like['id'],
+                comment['id'],
+                mtype = 'reacts to',
+                reaction = 'LIKE'
+            ) # user -|reacts to|> comment
 
-            logging.info("++ LIKE: %s" % like['name'])
+            logging.info( "++ LIKE: %s" % like['name'] )
 
         replies = graph.get_all_connections(
             id = comment['id'],
@@ -500,45 +430,26 @@ for post in posts:
             logging.debug(reply)
             num_comments += 1
 
-            G.add_node(
+            add_comment( G , reply , post)
+
+            if not nx.get_node_attributes( G , reply['from']['id'] ):
+                add_user( G , reply['from'] )
+
+            G.add_edge(
                 reply['id'],
-                mtype = 'comment',
-                fid = reply['id'],
-                label = reply.get('message','')[0:12]+'...',
-                url = "https://facebook.com/%s/posts/%s/?comment_id=%s" % (post['from']['id'], post['id'].split('_')[1], reply['id']),
-                message = reply.get('message',''),
-                hashtags = json.dumps(re.findall(fb_hashtag_regex, reply.get('message',''))),
-                links = json.dumps(re.findall(fb_url_regex, reply.get('message',''))),
-                timestamp = reply.get('created_time','__NA__')
-            ) # comment
+                comment['id'],
+                mtype = 'in reply to'
+            ) # comment -|in reply to|> comment
 
-            if not nx.get_node_attributes(G, reply['from']['id']):
-                G.add_node(
-                    reply['from']['id'],
-                    mtype = 'user',
-                    fid = reply['from']['id'],
-                    label = reply['from'].get('name','__NA__'),
-                    url = "https://facebook.com/%s" % reply['from']['id'],
-                    name = reply['from'].get('name','__NA__'),
-                    about = '__NA__',
-                    age_range = "0 - 99",
-                    birthyear = '__NA__',
-                    birthday = '__NA__',
-                    cover = '__NA__',
-                    education = '__NA__',
-                    email = '__NA__',
-                    gender = '__NA__',
-                    hometown = '__NA__',
-                    is_verified = '__NA__',
-                    work = '__NA__'
-                ) # user
+            G.add_edge(
+                reply['from']['id'],
+                reply['id'],
+                mtype = 'is author of'
+            ) # user -|is author of|> comment
 
-            G.add_edge(reply['id'], comment['id'], mtype = 'in reply to') # comment -|in reply to|> comment
-            G.add_edge(reply['from']['id'], reply['id'], mtype = 'is author of') # user -|is author of|> comment
-
-            logging.info("--- REPLY: %s" % reply.get('message',''))
-            logging.info("+++ DATETIME: %s" % reply['created_time'])
-            logging.info("+++ AUTHOR: %s" % reply['from']['name'])
+            logging.info( "--- REPLY: %s" % reply.get('message','') )
+            logging.info( "+++ DATETIME: %s" % reply['created_time'] )
+            logging.info( "+++ AUTHOR: %s" % reply['from']['name'] )
 
             for mention in reply.get('message_tags',[]):
 
@@ -549,30 +460,16 @@ for post in posts:
 
                 num_mentions += 1
 
-                if not nx.get_node_attributes(G, mention['id']):
-                    G.add_node(
-                        mention['id'],
-                        mtype = 'user',
-                        fid = mention['id'],
-                        label = mention.get('name','__NA__'),
-                        url = "https://facebook.com/%s" % mention['id'],
-                        name = mention.get('name','__NA__'),
-                        about = '__NA__',
-                        age_range = "0 - 99",
-                        birthyear = '__NA__',
-                        birthday = '__NA__',
-                        cover = '__NA__',
-                        education = '__NA__',
-                        email = '__NA__',
-                        gender = '__NA__',
-                        hometown = '__NA__',
-                        is_verified = '__NA__',
-                        work = '__NA__'
-                    ) # user
+                if not nx.get_node_attributes( G , mention['id'] ):
+                    add_user( G , mention )
 
-                G.add_edge(reply['id'], mention['id'], mtype = 'mentions') # comment -|mentions|> user
+                G.add_edge(
+                    reply['id'],
+                    mention['id'],
+                    mtype = 'mentions'
+                ) # comment -|mentions|> user
 
-                logging.info("++ MENTIONS: %s" % mention.get('name','__NA__'))
+                logging.info( "++ MENTIONS: %s" % mention.get('name','__NA__') )
 
             reply_likes = graph.get_all_connections(
                 id = reply['id'],
@@ -584,45 +481,31 @@ for post in posts:
                 logging.debug(like)
                 num_reactions += 1
 
-                if not nx.get_node_attributes(G, like['id']):
-                    G.add_node(
-                        like['id'],
-                        mtype = 'user',
-                        fid = like['id'],
-                        label = like.get('name','__NA__'),
-                        url = "https://facebook.com/%s" % like['id'],
-                        name = like.get('name','__NA__'),
-                        about = '__NA__',
-                        age_range = "0 - 99",
-                        birthyear = '__NA__',
-                        birthday = '__NA__',
-                        cover = '__NA__',
-                        education = '__NA__',
-                        email = '__NA__',
-                        gender = '__NA__',
-                        hometown = '__NA__',
-                        is_verified = '__NA__',
-                        work = '__NA__'
-                    ) # user
+                if not nx.get_node_attributes( G , like['id'] ):
+                    add_user( G , like )
 
-                #G.add_edge('LIKE', reply['id']) # reaction <--> comment
-                G.add_edge(like['id'], reply['id'], mtype = 'reacts to', reaction = 'LIKE') # user -|reacts to|> comment
+                G.add_edge(
+                    like['id'],
+                    reply['id'],
+                    mtype = 'reacts to',
+                    reaction = 'LIKE'
+                ) # user -|reacts to|> comment
 
-                logging.info("+++ LIKE: %s" % like['name'])
+                logging.info( "+++ LIKE: %s" % like['name'] )
 
 G.graph['since'] = min([
-    datetime.strptime(d['timestamp'].split('+')[0],fb_datetime_format)
+    datetime.strptime( d['timestamp'].split('+')[0] , fb_datetime_format )
     for n,d in G.nodes(data=True)
     if d['mtype'] == 'post'
 ]).strftime(fb_datetime_format)
 
 G.graph['until'] = max([
-    datetime.strptime(d['timestamp'].split('+')[0],fb_datetime_format)
+    datetime.strptime( d['timestamp'].split('+')[0] , fb_datetime_format )
     for n,d in G.nodes(data=True)
     if d['mtype'] == 'post'
 ]).strftime(fb_datetime_format)
 
-logging.info("Statistics from %s to %s" % (G.graph['since'], G.graph['until']))
+logging.info( "Statistics from %s to %s" % ( G.graph['since'] , G.graph['until'] ) )
 logging.info(
         "Members: %d | Posts: %d | Reactions: %d | Shares: %d | Mentions: %d | Comments: %d | Nodes: %d | Edges: %d" % (
         len(filter(lambda (n, d): d['mtype'] == 'user', G.nodes(data=True))),
@@ -639,7 +522,7 @@ logging.info(
 # node positioning algo
 # http://networkx.readthedocs.io/en/latest/reference/drawing.html
 try:
-    if config.getboolean("Graph","calc_layout"):
+    if config.getboolean( "Graph" , "calc_layout" ):
         pos = nx.spring_layout(G) # Fruchterman-Reingold
         nx.set_node_attributes( G , 'x' , {str(k): float(v[0]) for k,v in pos.items()} )
         nx.set_node_attributes( G , 'y' , {str(k): float(v[1]) for k,v in pos.items()} )
@@ -649,7 +532,7 @@ except ConfigParser.NoOptionError, e:
     pass
 
 # export also in gexf format, supported by gephi
-nx.write_gexf(G, file_name+".gexf")
+nx.write_gexf( G , file_name+".gexf" )
 
 from networkx.readwrite import json_graph
 # node_link_data() sets links' target and source to nodes' indices in nodes array,
