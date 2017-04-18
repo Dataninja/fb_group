@@ -541,6 +541,11 @@ json_data = json_graph.node_link_data(G)
 for i,l in enumerate(json_data['links']):
     json_data['links'][i]['target'] = json_data['nodes'][l['target']]['id']
     json_data['links'][i]['source'] = json_data['nodes'][l['source']]['id']
+for i,n in enumerate(json_data['nodes']):
+    if 'links' in json_data['nodes'][i]:
+        json_data['nodes'][i]['links'] = json.loads(json_data['nodes'][i]['links'])
+    if 'hashtags' in json_data['nodes'][i]:
+        json_data['nodes'][i]['hashtags'] = json.loads(json_data['nodes'][i]['hashtags'])
 # end workaround
 with open(file_name+".json",'w') as f:
     json.dump(json_data, f)
