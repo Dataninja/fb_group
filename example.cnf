@@ -20,8 +20,9 @@ id: ; Id of the group you want to download
 #until_datetime: ; 
 
 [Graph]
-mode = archive ; Two modes: archive and update
-all_members = True ; All group members or only active ones in the time window
-calc_layout = False ; Apply force layout to find nodes' positions (numpy required)
-#file_name = graph ; Output file name, default it's the group name
+mode: archive ; Two modes: archive and update
+all_members: False ; All group members or only active ones in the time window
+calc_layout: False ; Apply force layout to find nodes' positions (numpy required)
+prepend_datetime: True ; Add present datetime as file_name prefix
+#file_name: graph ; Output file name, default it's the group name
 

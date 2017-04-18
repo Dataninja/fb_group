@@ -48,7 +48,14 @@ else:
     logging.error( "Please provide a configuration file." )
     exit()
 
-config = ConfigParser.SafeConfigParser()
+config = ConfigParser.SafeConfigParser({
+    "datetime_format": "%Y-%m-%d %H:%M:%S",
+    "mode": "archive",
+    "all_members": False,
+    "calc_layout": False,
+    "prepend_datetime": True
+})
+
 try:
     config.read(config_file)
 except Exception, e:
@@ -88,15 +95,8 @@ except facebook.GraphAPIError, e:
     logging.error( "Errors during connections to Facebook Graph API: %s." % e )
     exit()
 
-try:
-    datetime_format = config.get( "Datetime" , "datetime_format" )
-except ConfigParser.NoOptionError, e:
-    datetime_format = "%Y-%m-%d %H:%M:%S"
-
-try:
-    mode = config.get( "Graph" , "mode" )
-except ConfigParser.NoOptionError, e:
-    mode = "archive"
+datetime_format = config.get( "Datetime" , "datetime_format" )
+mode = config.get( "Graph" , "mode" )
 
 try:
     until_datetime = datetime.strptime(
@@ -126,10 +126,13 @@ if mode == "update":
         if d['mtype'] == 'post'
     ])
 
-else:
+elif mode == "archive":
 
     try:
-        file_name = "%s_%s" % ( datetime.now().strftime( "%Y%m%d%H%M" ) , config.get( "Graph" , "file_name" ).split('.')[0] )
+        if config.getboolean( "Graph" , "prepend_datetime" ):
+            file_name = "%s_%s" % ( datetime.now().strftime( "%Y%m%d%H%M" ) , config.get( "Graph" , "file_name" ).split('.')[0] )
+        else:
+            file_name = "%s" % config.get( "Graph" , "file_name" ).split('.')[0]
     except ConfigParser.NoOptionError, e:
         file_name = "%s_%s" % ( datetime.now().strftime( "%Y%m%d%H%M" ) , group['name'] )
 
@@ -151,16 +154,13 @@ G.graph['last_update'] = datetime.now().strftime(fb_datetime_format)
 
 # Group members: https://developers.facebook.com/docs/graph-api/reference/v2.8/group/members
 num_members = 0
-try:
-    if config.getboolean( "Graph" , "all_members" ):
-        members = graph.get_all_connections(
-            id = group_id,
-            connection_name = "members",
-            fields = "id,name,about,age_range,birthday,cover,education,email,gender,hometown,is_verified,work"
-        )
-    else:
-        members = []
-except ConfigParser.NoOptionError, e:
+if config.getboolean( "Graph" , "all_members" ):
+    members = graph.get_all_connections(
+        id = group_id,
+        connection_name = "members",
+        fields = "id,name,about,age_range,birthday,cover,education,email,gender,hometown,is_verified,work"
+    )
+else:
     members = []
 
 
@@ -528,8 +528,6 @@ try:
         nx.set_node_attributes( G , 'y' , {str(k): float(v[1]) for k,v in pos.items()} )
 except ImportError, e:
     logging.warning(e)
-except ConfigParser.NoOptionError, e:
-    pass
 
 # export also in gexf format, supported by gephi
 nx.write_gexf( G , file_name+".gexf" )
