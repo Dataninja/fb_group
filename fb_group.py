@@ -2,45 +2,13 @@
 import facebook, logging, ConfigParser, sys, json, re
 logging.basicConfig(level=logging.INFO)
 from datetime import datetime
+from urlparse import urlparse
+import tldextract
 import networkx as nx
 
 fb_datetime_format = "%Y-%m-%dT%H:%M:%S" # 2017-03-21T14:18:11+0000
-fb_hashtag_regex = re.compile( "#(?:\[[^\]]+\]|\S+)" )
-fb_url_regex = re.compile(
-    #u"^"
-    # protocol identifier
-    u"(?:(?:https?|ftp)://)"
-    # user:pass authentication
-    u"(?:\S+(?::\S*)?@)?"
-    u"(?:"
-    # IP address exclusion
-    # private & local networks
-    u"(?!(?:10|127)(?:\.\d{1,3}){3})"
-    u"(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})"
-    u"(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})"
-    # IP address dotted notation octets
-    # excludes loopback network 0.0.0.0
-    # excludes reserved space >= 224.0.0.0
-    # excludes network & broadcast addresses
-    # (first & last IP address of each class)
-    u"(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])"
-    u"(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}"
-    u"(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))"
-    u"|"
-    # host name
-    u"(?:(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)"
-    # domain name
-    u"(?:\.(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)*"
-    # TLD identifier
-    u"(?:\.(?:[a-z\u00a1-\uffff]{2,}))"
-    u" )"
-    # port number
-    u"(?::\d{2,5})?"
-    # resource path
-    u"(?:/\S*)?"
-    #u"$"
-    , re.UNICODE
-)
+fb_hashtag_regex = re.compile( u"#(?:\[[^\]]+\]|\S+)" , re.UNICODE )
+fb_url_regex = re.compile( u"(?:(?:https?|ftp)://[^ ]+)" , re.UNICODE )
 
 if len(sys.argv) > 1:
     config_file = sys.argv[1]
@@ -166,6 +134,8 @@ else:
 
 def add_user(graph, user):
 
+    logging.info( "- MEMBER: %s" % user.get('name','__NA__') )
+
     user_age_range = user.get('age_range',{})
 
     graph.add_node(
@@ -188,7 +158,32 @@ def add_user(graph, user):
         work = user.get('work',[{}])[0].get('position',{}).get('link','__NA__')
     ) # user
 
+def add_domain(graph, link, post):
+
+    uri = urlparse(link)
+    tld = tldextract.extract("{uri.netloc}".format(uri=uri))
+
+    graph.add_node(
+        tld.registered_domain,
+        mtype = 'domain',
+        label = tld.registered_domain,
+        url = "%s://%s/" % ( uri.scheme , tld.registered_domain )
+    ) # domain
+
+    graph.add_edge(
+        post['id'],
+        tld.registered_domain,
+        mtype = 'mentions',
+        domain = "{uri.netloc}".format(uri=uri),
+        resource = "{uri.scheme}://{uri.netloc}{uri.path}".format(uri=uri),
+        url = link
+    ) # post -|mentions|> domain
+
 def add_post(graph, post):
+
+    logging.info( "- POST: %s" % post.get('message','') )
+    logging.info( "+ DATETIME: %s" % post['updated_time'] )
+    logging.info( "+ AUTHOR: %s" % post['from']['name'] )
 
     graph.add_node(
         post['id'],
@@ -201,11 +196,19 @@ def add_post(graph, post):
         ),
         message = post.get('message',''),
         hashtags = json.dumps(re.findall( fb_hashtag_regex , post.get('message','') )),
-        links = json.dumps(re.findall( fb_url_regex , post.get('message','') ) + ([post['link']] if 'link' in post else [])),
         timestamp = post.get('updated_time','__NA__')
     ) # post
 
+    links = re.findall( fb_url_regex , post.get('message','') )
+    logging.debug(links)
+    for link in links:
+        add_domain(graph, link, post)
+
 def add_comment(graph, comment, post):
+
+    logging.info( "-- COMMENT: %s" % comment.get('message','') )
+    logging.info( "++ DATETIME: %s" % comment['created_time'] )
+    logging.info( "++ AUTHOR: %s" % comment['from']['name'] )
 
     graph.add_node(
         comment['id'],
@@ -219,10 +222,13 @@ def add_comment(graph, comment, post):
         ),
         message = comment.get('message',''),
         hashtags = json.dumps(re.findall( fb_hashtag_regex , comment.get('message','') )),
-        links = json.dumps(re.findall( fb_url_regex , comment.get('message','') )),
         timestamp = comment.get('created_time','__NA__')
     ) # comment
 
+    links = re.findall( fb_url_regex , comment.get('message','') )
+    logging.debug(links)
+    for link in links:
+        add_domain(graph, link, comment)
 
 for member in members:
 
@@ -230,8 +236,6 @@ for member in members:
     num_members += 1
 
     add_user(G,member)
-
-    logging.info( "- MEMBER: %s" % member['name'])
 
 logging.info( "Download graph from %s to %s" % ( since_datetime , until_datetime ))
 
@@ -263,10 +267,6 @@ for post in posts:
         post['id'],
         mtype = 'is author of'
     ) # user -|is author of|> post
-
-    logging.info( "- POST: %s" % post.get('message','') )
-    logging.info( "+ DATETIME: %s" % post['updated_time'] )
-    logging.info( "+ AUTHOR: %s" % post['from']['name'] )
 
     for mention in post.get('to',{}).get('data',[]):
 
@@ -373,10 +373,6 @@ for post in posts:
             mtype = 'is author of'
         ) # user -|is author of|> comment
 
-        logging.info( "-- COMMENT: %s" % comment.get('message','') )
-        logging.info( "++ DATETIME: %s" % comment['created_time'] )
-        logging.info( "++ AUTHOR: %s" % comment['from']['name'] )
-
         for mention in comment.get('message_tags',[]):
 
             logging.debug(mention)
@@ -446,10 +442,6 @@ for post in posts:
                 reply['id'],
                 mtype = 'is author of'
             ) # user -|is author of|> comment
-
-            logging.info( "--- REPLY: %s" % reply.get('message','') )
-            logging.info( "+++ DATETIME: %s" % reply['created_time'] )
-            logging.info( "+++ AUTHOR: %s" % reply['from']['name'] )
 
             for mention in reply.get('message_tags',[]):
 
@@ -540,8 +532,8 @@ for i,l in enumerate(json_data['links']):
     json_data['links'][i]['target'] = json_data['nodes'][l['target']]['id']
     json_data['links'][i]['source'] = json_data['nodes'][l['source']]['id']
 for i,n in enumerate(json_data['nodes']):
-    if 'links' in json_data['nodes'][i]:
-        json_data['nodes'][i]['links'] = json.loads(json_data['nodes'][i]['links'])
+#    if 'links' in json_data['nodes'][i]:
+#        json_data['nodes'][i]['links'] = json.loads(json_data['nodes'][i]['links'])
     if 'hashtags' in json_data['nodes'][i]:
         json_data['nodes'][i]['hashtags'] = json.loads(json_data['nodes'][i]['hashtags'])
 # end workaround

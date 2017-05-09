@@ -2,3 +2,7 @@ ConfigParser
 -e git+https://github.com/mobolic/facebook-sdk.git#egg=facebook-sdk
 networkx
 numpy
+tldextract
+pyOpenSSL
+ndg-httpsclient
+pyasn1
