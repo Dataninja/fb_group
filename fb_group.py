@@ -230,6 +230,20 @@ def add_comment(graph, comment, post):
     for link in links:
         add_domain(graph, link, comment)
 
+def add_reaction(graph, reaction, post):
+
+    if not nx.get_node_attributes( graph , reaction['id'] ):
+        add_user( graph , reaction )
+
+    graph.add_edge(
+        reaction['id'],
+        post['id'],
+        mtype = 'reacts to',
+        reaction = reaction['type']
+    ) # user -|reacts to|> post
+
+    logging.info( "+ %s: %s" % ( reaction['type'] , reaction['name'] ) )
+
 for member in members:
 
     logging.debug(member)
@@ -321,17 +335,7 @@ for post in posts:
         logging.debug(reaction)
         num_reactions += 1
 
-        if not nx.get_node_attributes( G , reaction['id'] ):
-            add_user( G , reaction )
-
-        G.add_edge(
-            reaction['id'],
-            post['id'],
-            mtype = 'reacts to',
-            reaction = reaction['type']
-        ) # user -|reacts to|> post
-
-        logging.info( "+ %s: %s" % ( reaction['type'] , reaction['name'] ) )
+        add_reaction( G , reaction , post )
 
     comments = graph.get_all_connections(
         id = post['id'],
@@ -393,27 +397,17 @@ for post in posts:
 
             logging.info( "++ MENTIONS: %s" % mention.get('name','__NA__') )
 
-        comment_likes = graph.get_all_connections(
+        comment_reactions = graph.get_all_connections(
             id = comment['id'],
-            connection_name = "likes"
+            connection_name = "reactions"
         )
 
-        for like in comment_likes:
+        for reaction in comment_reactions:
 
-            logging.debug(like)
+            logging.debug(reaction)
             num_reactions += 1
 
-            if not nx.get_node_attributes( G , like['id'] ):
-                add_user( G , like )
-
-            G.add_edge(
-                like['id'],
-                comment['id'],
-                mtype = 'reacts to',
-                reaction = 'LIKE'
-            ) # user -|reacts to|> comment
-
-            logging.info( "++ LIKE: %s" % like['name'] )
+            add_reaction( G , reaction , comment )
 
         replies = graph.get_all_connections(
             id = comment['id'],
@@ -463,27 +457,17 @@ for post in posts:
 
                 logging.info( "++ MENTIONS: %s" % mention.get('name','__NA__') )
 
-            reply_likes = graph.get_all_connections(
+            reply_reactions = graph.get_all_connections(
                 id = reply['id'],
-                connection_name = "likes"
+                connection_name = "reactions"
             )
 
-            for like in reply_likes:
+            for reaction in reply_reactions:
 
-                logging.debug(like)
+                logging.debug(reaction)
                 num_reactions += 1
 
-                if not nx.get_node_attributes( G , like['id'] ):
-                    add_user( G , like )
-
-                G.add_edge(
-                    like['id'],
-                    reply['id'],
-                    mtype = 'reacts to',
-                    reaction = 'LIKE'
-                ) # user -|reacts to|> comment
-
-                logging.info( "+++ LIKE: %s" % like['name'] )
+                add_reaction( G , reaction , reply )
 
 G.graph['since'] = min([
     datetime.strptime( d['timestamp'].split('+')[0] , fb_datetime_format )

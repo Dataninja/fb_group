@@ -51,7 +51,7 @@ Harvested data are organized in a graph structure:
   * comment -|mentions|-> user,
   * comment -|mentions|-> domain.
 
-There are four types of nodes and four types of edges. Nodes have additional attributes (ie. name of user, message for posts and comments). The -|reacts to|-> edge has an attribute, the [type of reaction](https://developers.facebook.com/docs/graph-api/reference/post/reactions) (LIKE, LOVE, WOW, HAHA, SAD, ANGRY, THANKFUL[, SHARE]), and the -|mentions|-> one directed to a domain has many attributs, including original link.
+There are four types of nodes and four types of edges. Nodes have additional attributes (ie. name of user, message for posts and comments). The -|reacts to|-> edge has an attribute for both posts and comments, the [type of reaction](https://developers.facebook.com/docs/graph-api/reference/post/reactions) (LIKE, LOVE, WOW, HAHA, SAD, ANGRY, THANKFUL[, SHARE]), and the -|mentions|-> one directed to a domain has many attributs, including original link.
 
 This graph is saved in two formats: [GEXF](https://networkx.github.io/documentation/development/reference/generated/networkx.readwrite.gexf.write_gexf.html#networkx.readwrite.gexf.write_gexf) and [JSON](https://networkx.github.io/documentation/development/reference/generated/networkx.readwrite.json_graph.node_link_data.html#networkx.readwrite.json_graph.node_link_data).
 
