@@ -2,3 +2,4 @@ ConfigParser
 -e git+https://github.com/mobolic/facebook-sdk.git#egg=facebook-sdk
 networkx
 numpy
+unicodecsv

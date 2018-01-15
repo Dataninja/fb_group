@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import facebook, logging, ConfigParser, sys, json
+import unicodecsv as csv
 logging.basicConfig(level=logging.INFO)
 from datetime import datetime
 import networkx as nx
@@ -33,7 +34,7 @@ except ConfigParser.NoOptionError, e:
 
 graph = facebook.GraphAPI(
     access_token = access_token,
-    version = "2.8"
+    version = "2.11"
 )
 
 try:
@@ -113,19 +114,37 @@ else:
 
 G.graph['last_update'] = datetime.now().strftime(fb_datetime_format)
 
-# Group members: https://developers.facebook.com/docs/graph-api/reference/v2.8/group/members
+# Group members: https://developers.facebook.com/docs/graph-api/reference/v2.11/group/members
 num_members = 0
 try:
     if config.getboolean("Graph","all_members"):
+        logging.info("Download all members list from %s to %s" % ( since_datetime , until_datetime ))
         members = graph.get_all_connections(
             id = group_id,
             connection_name = "members",
-            fields = "id,name,about,age_range,birthday,cover,education,email,gender,hometown,is_verified,work"
+            fields = "id,name"
         )
     else:
         members = []
 except ConfigParser.NoOptionError, e:
     members = []
+
+if members:
+    with open(file_name+'_members.csv','w') as f:
+        writer = csv.DictWriter(f, fieldnames = ['id','name','url'], encoding='utf-8')
+        writer.writeheader()
+        for m in members:
+            member = graph.get_object(
+                id = m['id'],
+                fields = 'id,name'
+            )
+            writer.writerow({
+                'id': member['id'],
+                'name': member.get('name',''),
+                'url': 'https://www.facebook.com/'+member['id']
+            })
+
+logging.info("Download graph from %s to %s" % ( since_datetime , until_datetime ))
 
 for member in members:
 
@@ -155,8 +174,6 @@ for member in members:
     ) # user
 
     logging.info("- MEMBER: %s" % member['name'])
-
-logging.info("Download graph from %s to %s" % ( since_datetime , until_datetime ))
 
 posts = graph.get_all_connections(
     id = group_id,
