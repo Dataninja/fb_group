@@ -1,6 +1,6 @@
 # Facebook group harvester
 
-Download all data from a Facebook Group: posts, comments (and subcomments), likes, reactions, users, shares and user mentions using the [official facebook-sdk module](https://github.com/mobolic/facebook-sdk/) for Python 2.7. WARNING! Under development, not all features are implemented or to be considered stable.
+Download all data from a Facebook Group: posts, comments (and subcomments), likes, reactions, users, shares, user mentions and shared links using the [official facebook-sdk module](https://github.com/mobolic/facebook-sdk/) for Python 2.7. WARNING! Under development, not all features are implemented or to be considered stable.
 
 ## Installation
 
@@ -38,18 +38,20 @@ Run: `python fb_group.py your_group_name.cnf`. Standard output is quite verbose.
 
 Harvested data are organized in a graph structure:
 
-* nodes: users, posts, comments;
+* nodes: users, posts, comments, domains;
 * edges:
   * user -|is author of|-> post,
   * user -|is author of|-> comment,
   * user -|reacts to|-> post,
-  * user -|reacts to|-> comment
-  * post -|mentions|-> user
+  * user -|reacts to|-> comment,
+  * post -|mentions|-> user,
+  * post -|mentions|-> domain,
   * comment -|in reply to|-> post,
   * comment -|in reply to|-> comment,
-  * comment -|mentions|-> user.
+  * comment -|mentions|-> user,
+  * comment -|mentions|-> domain.
 
-There are three types of nodes and four types of edges. Nodes have additional attributes (ie. name of user, message for posts and comments). Only the -|reacts to|-> edge has an attribute, the [type of reaction](https://developers.facebook.com/docs/graph-api/reference/post/reactions) (LIKE, LOVE, WOW, HAHA, SAD, ANGRY, THANKFUL[, SHARE]).
+There are four types of nodes and four types of edges. Nodes have additional attributes (ie. name of user, message for posts and comments). The -|reacts to|-> edge has an attribute for both posts and comments, the [type of reaction](https://developers.facebook.com/docs/graph-api/reference/post/reactions) (LIKE, LOVE, WOW, HAHA, SAD, ANGRY, THANKFUL[, SHARE]), and the -|mentions|-> one directed to a domain has many attributs, including original link.
 
 This graph is saved in two formats: [GEXF](https://networkx.github.io/documentation/development/reference/generated/networkx.readwrite.gexf.write_gexf.html#networkx.readwrite.gexf.write_gexf) and [JSON](https://networkx.github.io/documentation/development/reference/generated/networkx.readwrite.json_graph.node_link_data.html#networkx.readwrite.json_graph.node_link_data).
 
